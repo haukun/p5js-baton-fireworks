@@ -24,7 +24,18 @@
   let activeSlot = slotA;
   let nextSlot = slotB;
 
+  // P5.jsをインラインで埋め込むために事前に読み込む
+  let p5Source = '';
+
   async function init() {
+    try {
+      const p5Response = await fetch('p5.min.js');
+      p5Source = await p5Response.text();
+    } catch (e) {
+      console.error('p5.min.js の読み込みに失敗:', e);
+      return;
+    }
+
     try {
       const response = await fetch('entries.json');
       entries = await response.json();
@@ -107,7 +118,7 @@
   }
 
   async function loadSketchInSlot(slot, entry, paused) {
-    const codeUrl = `entries/${entry.id}/sketch.js?t=${Date.now()}`;
+    const codeUrl = `../entries/${entry.id}/sketch.js?t=${Date.now()}`;
     let code;
     try {
       const response = await fetch(codeUrl);
@@ -146,7 +157,7 @@
   </style>
 </head>
 <body>
-  <script src="https://cdn.jsdelivr.net/npm/p5@1.9.4/lib/p5.min.js" integrity="sha384-6Twx1hAeKnwfOYJAHtYeJETRiGD5pRPkjjh0pVbG1QoesncjOpw5e75Y1kOkXeRI" crossorigin="anonymous"><\/script>
+  <script>${p5Source}<\/script>
   <script>
     window.onerror = function(msg, src, line) {
       console.error('Sketch error:', msg, 'line:', line);

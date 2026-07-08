@@ -168,9 +168,10 @@ jobs:
       - name: Prepare deploy directory
         if: steps.parse.outputs.has_errors == 'false'
         run: |
-          mkdir -p _site
-          cp -r viewer-fireworks/* _site/
+          mkdir -p _site/viewer-fireworks
+          cp -r viewer-fireworks/* _site/viewer-fireworks/
           cp -r entries _site/entries
+          echo '<meta http-equiv="refresh" content="0;url=viewer-fireworks/">' > _site/index.html
 
       - name: Upload Pages artifact
         if: steps.parse.outputs.has_errors == 'false'

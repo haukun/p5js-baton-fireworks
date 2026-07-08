@@ -28,9 +28,11 @@ jobs:
 
       - name: Prepare deploy directory
         run: |
-          mkdir -p _site
-          cp -r viewer-fireworks/* _site/
+          mkdir -p _site/viewer-fireworks
+          cp -r viewer-fireworks/* _site/viewer-fireworks/
           cp -r entries _site/entries
+          # ルートからviewer-fireworksにリダイレクト
+          echo '<meta http-equiv="refresh" content="0;url=viewer-fireworks/">' > _site/index.html
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
