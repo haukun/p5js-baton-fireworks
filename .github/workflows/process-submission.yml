@@ -164,14 +164,17 @@ jobs:
 
             const iconField = extractField(body, 'アイコン画像 / Icon');
             
-            // Markdown画像URLを抽出
-            const imgMatch = iconField.match(/!\[.*?\]\((https:\/\/[^)]+)\)/);
-            if (!imgMatch) {
+            // Markdown画像URL または HTML imgタグからURLを抽出
+            let imgUrl = null;
+            const mdMatch = iconField.match(/!\[.*?\]\((https:\/\/[^)]+)\)/);
+            const htmlMatch = iconField.match(/<img[^>]+src="(https:\/\/[^"]+)"/);
+            if (mdMatch) imgUrl = mdMatch[1];
+            else if (htmlMatch) imgUrl = htmlMatch[1];
+
+            if (!imgUrl) {
               console.log('No icon image found, skipping');
               return;
             }
-
-            const imgUrl = imgMatch[1];
             console.log('Icon URL:', imgUrl);
 
             // ダウンロード
