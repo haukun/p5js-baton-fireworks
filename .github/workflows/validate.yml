@@ -141,10 +141,7 @@ jobs:
               ERRORS="${ERRORS}\n❌ $file: const AUTHOR が見つかりません"
             fi
 
-            # 5. createCanvas が使われていないか
-            if grep -qE 'createCanvas\s*\(' "$file"; then
-              ERRORS="${ERRORS}\n❌ $file: createCanvas() は使用禁止です（システムが自動設定します）"
-            fi
+            # 5. createCanvasチェック（不要: システムが自動除去）
 
             # 6. 禁止API チェック
             BANNED_PATTERNS='(fetch\s*\(|XMLHttpRequest|import\s|require\s*\(|eval\s*\(|Function\s*\(|window\.open)'

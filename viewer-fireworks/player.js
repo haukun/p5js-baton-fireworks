@@ -130,7 +130,8 @@
   function createSketchBlobURL(userCode, paused) {
     let transformedCode = userCode
       .replace(/function\s+setup\s*\(/g, 'function __p5c_setup__(')
-      .replace(/function\s+draw\s*\(/g, 'function __p5c_draw__(');
+      .replace(/function\s+draw\s*\(/g, 'function __p5c_draw__(')
+      .replace(/createCanvas\s*\([^)]*\)\s*;?/g, '// createCanvas removed by system');
 
     const safeCode = transformedCode.replace(/<\/script>/g, '<\\/script>');
     const startDelay = 500 + CROSSFADE_DURATION; // クロスフェード完了後にdraw開始
