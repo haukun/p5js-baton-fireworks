@@ -259,7 +259,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const siteUrl = 'https://haukun.github.io/p5js-banon-fireworks/';
+            const siteUrl = 'https://haukun.github.io/p5js-baton-fireworks/';
 
             const isUpdate = '${{ steps.parse.outputs.is_update }}' === 'true';
             const msg = isUpdate ? '更新' : '登録';
