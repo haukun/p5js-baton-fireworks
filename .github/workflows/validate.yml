@@ -1,0 +1,267 @@
+name: Validate & Auto-Merge
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'entries/**'
+      - '.registry.json'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Fetch base branch for comparison
+        run: git fetch origin ${{ github.event.pull_request.base.ref }} --depth=1
+
+      - name: Check for unauthorized modifications
+        run: |
+          # PR で変更・削除された全ファイルを取得
+          ALL_CHANGES=$(git diff --name-status origin/${{ github.event.pull_request.base.ref }} HEAD -- entries/ || true)
+
+          if [ -z "$ALL_CHANGES" ]; then
+            echo "No changes in entries/"
+            exit 0
+          fi
+
+          echo "Changes detected:"
+          echo "$ALL_CHANGES"
+
+          ERRORS=""
+
+          # 削除 (D) を検出 → 既存作品の削除は禁止
+          DELETED=$(echo "$ALL_CHANGES" | grep '^D' | awk '{print $2}' || true)
+          if [ -n "$DELETED" ]; then
+            ERRORS="${ERRORS}\n❌ 既存ファイルの削除は禁止されています:\n$DELETED"
+          fi
+
+          # 変更 (M) を検出 → 既存作品の上書きは禁止
+          MODIFIED=$(echo "$ALL_CHANGES" | grep '^M' | awk '{print $2}' || true)
+          if [ -n "$MODIFIED" ]; then
+            ERRORS="${ERRORS}\n❌ 既存ファイルの変更は禁止されています:\n$MODIFIED"
+          fi
+
+          # entries/ 以外のファイルが変更されていないかチェック（.registry.json は除外）
+          OTHER_CHANGES=$(git diff --name-only origin/${{ github.event.pull_request.base.ref }} HEAD | grep -v '^entries/' | grep -v '^\.registry\.json$' || true)
+          if [ -n "$OTHER_CHANGES" ]; then
+            ERRORS="${ERRORS}\n❌ entries/ 以外のファイルは変更できません:\n$OTHER_CHANGES"
+          fi
+
+          if [ -n "$ERRORS" ]; then
+            echo -e "\n===== SECURITY CHECK FAILED ====="
+            echo -e "$ERRORS"
+            echo ""
+            echo "ℹ️ 自分の作品を修正したい場合は、新しいPRを作成してください。"
+            echo "   管理者が手動で確認・マージします。"
+            exit 1
+          fi
+
+          echo "✅ Security check passed: new files only"
+
+      - name: Check one-entry-per-user limit
+        run: |
+          PR_AUTHOR="${{ github.event.pull_request.user.login }}"
+          # GitHubユーザー名のSHA-256ハッシュを生成
+          AUTHOR_HASH=$(echo -n "$PR_AUTHOR" | sha256sum | awk '{print $1}')
+
+          echo "PR author hash: $AUTHOR_HASH"
+
+          # .registry.json が存在するか確認（base ブランチから取得）
+          git show origin/${{ github.event.pull_request.base.ref }}:.registry.json > /tmp/registry.json 2>/dev/null || echo "{}" > /tmp/registry.json
+
+          # 既に登録済みかチェック
+          if node -e "
+            const reg = require('/tmp/registry.json');
+            if (reg['$AUTHOR_HASH']) {
+              console.log('❌ このGitHubアカウントは既に作品を投稿済みです（1アカウント1作品まで）');
+              console.log('   既存エントリー: ' + reg['$AUTHOR_HASH']);
+              process.exit(1);
+            }
+          "; then
+            echo "✅ One-entry-per-user check passed"
+          else
+            exit 1
+          fi
+
+      - name: Find new/modified sketch files
+        id: find-sketches
+        run: |
+          # PR で追加された entries/ 内のファイルを取得（新規追加のみ）
+          FILES=$(git diff --name-only --diff-filter=A origin/${{ github.event.pull_request.base.ref }} HEAD | grep '^entries/.*sketch\.js$' || true)
+          echo "files<<EOF" >> $GITHUB_OUTPUT
+          echo "$FILES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          if [ -z "$FILES" ]; then
+            echo "No new sketch files found in PR"
+            exit 0
+          fi
+
+      - name: Validate sketch files
+        if: steps.find-sketches.outputs.files != ''
+        run: |
+          ERRORS=""
+
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+            echo "=== Validating: $file ==="
+
+            # 1. ファイルが存在するか
+            if [ ! -f "$file" ]; then
+              ERRORS="${ERRORS}\n❌ $file: ファイルが見つかりません"
+              continue
+            fi
+
+            # 2. ファイルサイズチェック（50KB以下）
+            SIZE=$(wc -c < "$file")
+            if [ "$SIZE" -gt 51200 ]; then
+              ERRORS="${ERRORS}\n❌ $file: ファイルサイズが50KBを超えています (${SIZE} bytes)"
+              continue
+            fi
+
+            # 3. TITLE 定数が存在するか
+            if ! grep -qE 'const\s+TITLE\s*=' "$file"; then
+              ERRORS="${ERRORS}\n❌ $file: const TITLE が見つかりません"
+            fi
+
+            # 4. AUTHOR 定数が存在するか
+            if ! grep -qE 'const\s+AUTHOR\s*=' "$file"; then
+              ERRORS="${ERRORS}\n❌ $file: const AUTHOR が見つかりません"
+            fi
+
+            # 5. createCanvas が使われていないか
+            if grep -qE 'createCanvas\s*\(' "$file"; then
+              ERRORS="${ERRORS}\n❌ $file: createCanvas() は使用禁止です（システムが自動設定します）"
+            fi
+
+            # 6. 禁止API チェック
+            BANNED_PATTERNS='(fetch\s*\(|XMLHttpRequest|import\s|require\s*\(|eval\s*\(|Function\s*\(|window\.open)'
+            if grep -qE "$BANNED_PATTERNS" "$file"; then
+              MATCHED=$(grep -nE "$BANNED_PATTERNS" "$file" | head -5)
+              ERRORS="${ERRORS}\n❌ $file: 禁止APIが検出されました:\n$MATCHED"
+            fi
+
+            # 7. システム内部変数のハック防止
+            SYSTEM_VARS='(__userFrameCount|__drawEnabled|__waiting|__frameOffset|__p5c_setup__|__p5c_draw__|sketch-complete|setup-complete|noLoop\s*\(\s*\)\s*.*postMessage)'
+            if grep -qE "$SYSTEM_VARS" "$file"; then
+              MATCHED=$(grep -nE "$SYSTEM_VARS" "$file" | head -5)
+              ERRORS="${ERRORS}\n❌ $file: システム内部変数へのアクセスは禁止されています:\n$MATCHED"
+            fi
+
+            # 8. JavaScript構文チェック
+            node --check "$file" 2>/dev/null
+            if [ $? -ne 0 ]; then
+              ERRORS="${ERRORS}\n❌ $file: JavaScript構文エラーがあります"
+            fi
+
+            echo "✅ $file: OK"
+          done <<< "${{ steps.find-sketches.outputs.files }}"
+
+          if [ -n "$ERRORS" ]; then
+            echo -e "\n===== VALIDATION FAILED ====="
+            echo -e "$ERRORS"
+            exit 1
+          fi
+
+          echo "All sketches validated successfully!"
+
+      - name: Validate directory structure
+        if: steps.find-sketches.outputs.files != ''
+        run: |
+          # entries/ディレクトリ名/ にsketch.jsだけがあることを確認
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+            DIR=$(dirname "$file")
+
+            # ディレクトリ名のバリデーション（英数字、ハイフン、アンダースコアのみ）
+            DIRNAME=$(basename "$DIR")
+            if ! echo "$DIRNAME" | grep -qE '^[a-zA-Z0-9_-]+$'; then
+              echo "❌ ディレクトリ名は英数字、ハイフン、アンダースコアのみ使用可能: $DIRNAME"
+              exit 1
+            fi
+
+            # sketch.js 以外のファイルがないか確認
+            OTHER_FILES=$(find "$DIR" -type f ! -name 'sketch.js' | head -5)
+            if [ -n "$OTHER_FILES" ]; then
+              echo "❌ $DIR に sketch.js 以外のファイルがあります:"
+              echo "$OTHER_FILES"
+              exit 1
+            fi
+          done <<< "${{ steps.find-sketches.outputs.files }}"
+
+          echo "Directory structure OK!"
+
+  auto-merge:
+    needs: validate
+    runs-on: ubuntu-latest
+    if: success()
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Update registry
+        run: |
+          PR_AUTHOR="${{ github.event.pull_request.user.login }}"
+          AUTHOR_HASH=$(echo -n "$PR_AUTHOR" | sha256sum | awk '{print $1}')
+
+          # 新しく追加されたディレクトリ名を取得
+          git fetch origin ${{ github.event.pull_request.base.ref }} --depth=1
+          NEW_DIR=$(git diff --name-only --diff-filter=A origin/${{ github.event.pull_request.base.ref }} HEAD | grep '^entries/' | head -1 | cut -d'/' -f2)
+
+          if [ -z "$NEW_DIR" ]; then
+            echo "No new entry directory found, skipping registry update"
+            exit 0
+          fi
+
+          echo "Registering: $AUTHOR_HASH -> $NEW_DIR"
+
+          # .registry.json を更新
+          if [ -f .registry.json ]; then
+            node -e "
+              const fs = require('fs');
+              const reg = JSON.parse(fs.readFileSync('.registry.json', 'utf-8'));
+              reg['$AUTHOR_HASH'] = '$NEW_DIR';
+              fs.writeFileSync('.registry.json', JSON.stringify(reg, null, 2) + '\n');
+            "
+          else
+            node -e "
+              const fs = require('fs');
+              const reg = { '$AUTHOR_HASH': '$NEW_DIR' };
+              fs.writeFileSync('.registry.json', JSON.stringify(reg, null, 2) + '\n');
+            "
+          fi
+
+          # コミットしてプッシュ
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .registry.json
+          git commit -m "chore: register entry $NEW_DIR" || echo "No changes to commit"
+          git push
+
+      - name: Auto-approve PR
+        uses: hmarr/auto-approve-action@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Auto-merge PR
+        run: gh pr merge ${{ github.event.pull_request.number }} --squash --auto
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
