@@ -53,6 +53,8 @@ jobs:
             const bannedPatterns = [
               /\bfetch\s*\(/, /XMLHttpRequest/, /\bimport\s/, /\brequire\s*\(/,
               /\beval\s*\(/, /\bFunction\s*\(/, /window\.open/,
+              /WebSocket/, /EventSource/, /RTCPeerConnection/, /sendBeacon/,
+              /AudioContext/, /webkitAudioContext/,
               /__userFrameCount/, /__drawEnabled/, /__waiting/,
               /__frameOffset/, /__p5c_setup__/, /__p5c_draw__/,
             ];

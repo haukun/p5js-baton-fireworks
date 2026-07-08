@@ -146,11 +146,25 @@
   </style>
 </head>
 <body>
-  <script src="https://cdn.jsdelivr.net/npm/p5@1.9.4/lib/p5.min.js"><\/script>
+  <script src="https://cdn.jsdelivr.net/npm/p5@1.9.4/lib/p5.min.js" integrity="sha384-6Twx1hAeKnwfOYJAHtYeJETRiGD5pRPkjjh0pVbG1QoesncjOpw5e75Y1kOkXeRI" crossorigin="anonymous"><\/script>
   <script>
     window.onerror = function(msg, src, line) {
       console.error('Sketch error:', msg, 'line:', line);
     };
+
+    // セキュリティ: 危険なAPIを無効化
+    window.fetch = undefined;
+    window.XMLHttpRequest = undefined;
+    window.WebSocket = undefined;
+    window.EventSource = undefined;
+    window.RTCPeerConnection = undefined;
+    if (navigator.sendBeacon) navigator.sendBeacon = undefined;
+    window.alert = function(){};
+    window.confirm = function(){ return false; };
+    window.prompt = function(){ return null; };
+    window.open = undefined;
+    window.AudioContext = undefined;
+    window.webkitAudioContext = undefined;
 
     var __drawEnabled = ${paused ? 'false' : 'true'};
     var __userFrameCount = 0;

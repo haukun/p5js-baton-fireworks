@@ -144,7 +144,7 @@ jobs:
             # 5. createCanvasチェック（不要: システムが自動除去）
 
             # 6. 禁止API チェック
-            BANNED_PATTERNS='(fetch\s*\(|XMLHttpRequest|import\s|require\s*\(|eval\s*\(|Function\s*\(|window\.open)'
+            BANNED_PATTERNS='(fetch\s*\(|XMLHttpRequest|import\s|require\s*\(|eval\s*\(|Function\s*\(|window\.open|WebSocket|EventSource|RTCPeerConnection|sendBeacon|AudioContext|webkitAudioContext)'
             if grep -qE "$BANNED_PATTERNS" "$file"; then
               MATCHED=$(grep -nE "$BANNED_PATTERNS" "$file" | head -5)
               ERRORS="${ERRORS}\n❌ $file: 禁止APIが検出されました:\n$MATCHED"
