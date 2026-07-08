@@ -30,7 +30,7 @@ jobs:
             const body = issue.body || '';
 
             function extractField(body, label) {
-              const regex = new RegExp(`### ${label}\\s*\\n\\n([\\s\\S]*?)(?=\\n###|$)`);
+              const regex = new RegExp(`### ${label}[^\\n]*\\s*\\n\\n([\\s\\S]*?)(?=\\n###|$)`);
               const match = body.match(regex);
               return match ? match[1].trim() : '';
             }
@@ -124,7 +124,7 @@ jobs:
             const body = issue.body || '';
 
             function extractField(body, label) {
-              const regex = new RegExp(`### ${label}\\s*\\n\\n([\\s\\S]*?)(?=\\n###|$)`);
+              const regex = new RegExp(`### ${label}[^\\n]*\\s*\\n\\n([\\s\\S]*?)(?=\\n###|$)`);
               const match = body.match(regex);
               return match ? match[1].trim() : '';
             }
@@ -157,12 +157,12 @@ jobs:
             const entryName = '${{ steps.parse.outputs.entry_name }}';
 
             function extractField(body, label) {
-              const regex = new RegExp(`### ${label}\\s*\\n\\n([\\s\\S]*?)(?=\\n###|$)`);
+              const regex = new RegExp(`### ${label}[^\\n]*\\s*\\n\\n([\\s\\S]*?)(?=\\n###|$)`);
               const match = body.match(regex);
               return match ? match[1].trim() : '';
             }
 
-            const iconField = extractField(body, 'アイコン画像 / Icon \\(optional\\)');
+            const iconField = extractField(body, 'アイコン画像 / Icon');
             
             // Markdown画像URLを抽出
             const imgMatch = iconField.match(/!\[.*?\]\((https:\/\/[^)]+)\)/);
