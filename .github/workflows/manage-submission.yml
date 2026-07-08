@@ -1,0 +1,226 @@
+name: Manage Submission (Update/Delete)
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+  issues: write
+  pages: write
+  id-token: write
+
+jobs:
+  manage:
+    runs-on: ubuntu-latest
+    if: github.event.issue.title == '作品更新' || github.event.issue.title == '作品削除'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Identify user and action
+        id: identify
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const crypto = require('crypto');
+            const path = require('path');
+
+            const issue = context.payload.issue;
+            const isUpdate = issue.title === '作品更新';
+            const isDelete = issue.title === '作品削除';
+
+            const authorHash = crypto.createHash('sha256').update(issue.user.login).digest('hex');
+
+            // registryから自分のentryを探す
+            const registryPath = path.join(process.cwd(), '.registry.json');
+            const registry = fs.existsSync(registryPath)
+              ? JSON.parse(fs.readFileSync(registryPath, 'utf-8'))
+              : {};
+
+            const entryName = registry[authorHash] || '';
+
+            if (!entryName) {
+              core.setOutput('error', 'あなたの投稿が見つかりません。先に作品を投稿してください。');
+              core.setOutput('has_entry', 'false');
+              return;
+            }
+
+            core.setOutput('has_entry', 'true');
+            core.setOutput('entry_name', entryName);
+            core.setOutput('author_hash', authorHash);
+            core.setOutput('is_update', isUpdate ? 'true' : 'false');
+            core.setOutput('is_delete', isDelete ? 'true' : 'false');
+
+      - name: Report no entry found
+        if: steps.identify.outputs.has_entry == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `## ❌ エラー\n\n${{ steps.identify.outputs.error }}\n\n---\n*このIssueは自動クローズされます。*`
+            });
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              state: 'closed'
+            });
+
+      # === UPDATE ===
+      - name: Validate and update entry
+        if: steps.identify.outputs.has_entry == 'true' && steps.identify.outputs.is_update == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            const issue = context.payload.issue;
+            const body = issue.body || '';
+            const entryName = '${{ steps.identify.outputs.entry_name }}';
+
+            function extractField(body, label) {
+              const regex = new RegExp(`### ${label}\\s*\\n\\n([\\s\\S]*?)(?=\\n###|$)`);
+              const match = body.match(regex);
+              return match ? match[1].trim() : '';
+            }
+
+            let code = extractField(body, '新しいコード / New Code');
+            code = code.replace(/^```javascript\n?/i, '').replace(/^```js\n?/i, '').replace(/\n?```$/g, '').trim();
+
+            if (!code) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: '## ❌ エラー\n\nコードが空です。'
+              });
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                state: 'closed'
+              });
+              return;
+            }
+
+            // 禁止パターンチェック
+            const bannedPatterns = [
+              /\bfetch\s*\(/, /XMLHttpRequest/, /\bimport\s/, /\brequire\s*\(/,
+              /\beval\s*\(/, /\bFunction\s*\(/, /window\.open/,
+              /__userFrameCount/, /__drawEnabled/, /__waiting/,
+              /__frameOffset/, /__p5c_setup__/, /__p5c_draw__/,
+            ];
+
+            for (const pattern of bannedPatterns) {
+              if (pattern.test(code)) {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  body: `## ❌ エラー\n\n禁止パターンが検出されました: \`${pattern}\``
+                });
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  state: 'closed'
+                });
+                return;
+              }
+            }
+
+            // 既存のsketch.jsからTITLE/AUTHORを取得
+            const sketchPath = path.join('entries', entryName, 'sketch.js');
+            const existing = fs.readFileSync(sketchPath, 'utf-8');
+            const titleMatch = existing.match(/const\s+TITLE\s*=\s*("[^"]*"|'[^']*'|`[^`]*`)/);
+            const authorMatch = existing.match(/const\s+AUTHOR\s*=\s*("[^"]*"|'[^']*'|`[^`]*`)/);
+            const title = titleMatch ? titleMatch[1] : '"Untitled"';
+            const author = authorMatch ? authorMatch[1] : '"Anonymous"';
+
+            const content = `// ============================================================\nconst TITLE = ${title};\nconst AUTHOR = ${author};\n// ============================================================\n\n${code}\n`;
+            fs.writeFileSync(sketchPath, content);
+
+      # === DELETE ===
+      - name: Delete entry
+        if: steps.identify.outputs.has_entry == 'true' && steps.identify.outputs.is_delete == 'true'
+        run: |
+          ENTRY_NAME="${{ steps.identify.outputs.entry_name }}"
+          AUTHOR_HASH="${{ steps.identify.outputs.author_hash }}"
+
+          # ファイル削除
+          rm -rf "entries/${ENTRY_NAME}"
+
+          # registryから削除
+          node -e "
+            const fs = require('fs');
+            const reg = JSON.parse(fs.readFileSync('.registry.json', 'utf-8'));
+            delete reg['${AUTHOR_HASH}'];
+            fs.writeFileSync('.registry.json', JSON.stringify(reg, null, 2) + '\n');
+          "
+
+      # === 共通: ビルド & デプロイ ===
+      - name: Build entries.json
+        if: steps.identify.outputs.has_entry == 'true'
+        run: node scripts/build-entries.js
+
+      - name: Commit and push
+        if: steps.identify.outputs.has_entry == 'true'
+        run: |
+          ENTRY_NAME="${{ steps.identify.outputs.entry_name }}"
+          ACTION="${{ steps.identify.outputs.is_delete == 'true' && 'Delete' || 'Update' }}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "${ACTION} entry: ${ENTRY_NAME} (via issue #${{ github.event.issue.number }})" || echo "No changes"
+          git push
+
+      - name: Prepare deploy directory
+        if: steps.identify.outputs.has_entry == 'true'
+        run: |
+          mkdir -p _site
+          cp -r viewer-fireworks/* _site/
+          cp -r entries _site/entries
+
+      - name: Upload Pages artifact
+        if: steps.identify.outputs.has_entry == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        if: steps.identify.outputs.has_entry == 'true'
+        uses: actions/deploy-pages@v4
+
+      - name: Close issue with success
+        if: steps.identify.outputs.has_entry == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const isDelete = '${{ steps.identify.outputs.is_delete }}' === 'true';
+            const siteUrl = 'https://haukun.github.io/p5js-banon-fireworks/';
+            const msg = isDelete
+              ? '## ✅ 削除完了\n\nあなたの作品は削除されました。再投稿したい場合は「作品を投稿する」から再度投稿できます。'
+              : `## ✅ 更新完了\n\nあなたの作品が更新されました！\n\n🎆 ギャラリーで見る: ${siteUrl}\n\nデプロイが完了するまで1〜2分お待ちください。`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: msg + '\n\n---\n*このIssueは自動クローズされます。*'
+            });
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              state: 'closed'
+            });
