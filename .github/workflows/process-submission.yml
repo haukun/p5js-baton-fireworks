@@ -7,6 +7,8 @@ on:
 permissions:
   contents: write
   issues: write
+  pages: write
+  id-token: write
 
 jobs:
   process:
@@ -173,6 +175,23 @@ jobs:
           git add entries/ .registry.json viewer-fireworks/entries.json
           git commit -m "Add entry: ${ENTRY_NAME} (via issue #${{ github.event.issue.number }})"
           git push
+
+      - name: Prepare deploy directory
+        if: steps.parse.outputs.has_errors == 'false'
+        run: |
+          mkdir -p _site
+          cp -r viewer-fireworks/* _site/
+          cp -r entries _site/entries
+
+      - name: Upload Pages artifact
+        if: steps.parse.outputs.has_errors == 'false'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        if: steps.parse.outputs.has_errors == 'false'
+        uses: actions/deploy-pages@v4
 
       - name: Close issue with success
         if: steps.parse.outputs.has_errors == 'false'
