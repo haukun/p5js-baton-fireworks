@@ -21,15 +21,6 @@ body:
     validations:
       required: true
 
-  - type: input
-    id: entry_name
-    attributes:
-      label: "作品ID / Entry Name"
-      description: "半角英数字、ハイフン、アンダースコアのみ。フォルダ名になります。"
-      placeholder: "例: neon-fireworks"
-    validations:
-      required: true
-
   - type: textarea
     id: code
     attributes:
