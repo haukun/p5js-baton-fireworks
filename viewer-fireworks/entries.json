@@ -2,7 +2,8 @@
   {
     "id": "entry-2",
     "title": "テスト花火3",
-    "author": "Haukun"
+    "author": "Haukun",
+    "icon": "icon.png"
   },
   {
     "id": "example-bouncing-ball",
