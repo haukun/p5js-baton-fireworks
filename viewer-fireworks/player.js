@@ -107,7 +107,7 @@
   }
 
   async function loadSketchInSlot(slot, entry, paused) {
-    const codeUrl = `../entries/${entry.id}/sketch.js?t=${Date.now()}`;
+    const codeUrl = `entries/${entry.id}/sketch.js?t=${Date.now()}`;
     let code;
     try {
       const response = await fetch(codeUrl);
