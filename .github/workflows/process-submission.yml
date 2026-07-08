@@ -41,9 +41,6 @@ jobs:
 
             code = code.replace(/^```javascript\n?/i, '').replace(/^```js\n?/i, '').replace(/\n?```$/g, '').trim();
 
-            // 作品IDはIssue番号から自動生成
-            const entryName = `entry-${issue.number}`;
-
             const errors = [];
             if (!title) errors.push('作品タイトルが空です');
             if (!author) errors.push('作者名が空です');
@@ -54,28 +51,18 @@ jobs:
             }
 
             const bannedPatterns = [
-              /\bfetch\s*\(/,
-              /XMLHttpRequest/,
-              /\bimport\s/,
-              /\brequire\s*\(/,
-              /\beval\s*\(/,
-              /\bFunction\s*\(/,
-              /window\.open/,
-              /__userFrameCount/,
-              /__drawEnabled/,
-              /__waiting/,
-              /__frameOffset/,
-              /__p5c_setup__/,
-              /__p5c_draw__/,
+              /\bfetch\s*\(/, /XMLHttpRequest/, /\bimport\s/, /\brequire\s*\(/,
+              /\beval\s*\(/, /\bFunction\s*\(/, /window\.open/,
+              /__userFrameCount/, /__drawEnabled/, /__waiting/,
+              /__frameOffset/, /__p5c_setup__/, /__p5c_draw__/,
             ];
-
             for (const pattern of bannedPatterns) {
               if (pattern.test(code)) {
                 errors.push(`禁止パターンが検出されました: ${pattern}`);
               }
             }
 
-            // 1人1作品チェック
+            // 作品IDの決定: 既に投稿済みなら既存のIDを使う（上書き）、なければ新規
             const fs = require('fs');
             const path = require('path');
             const crypto = require('crypto');
@@ -85,9 +72,8 @@ jobs:
               : {};
             const authorHash = crypto.createHash('sha256').update(issue.user.login).digest('hex');
 
-            if (registry[authorHash]) {
-              errors.push(`このアカウントは既に作品を投稿済みです（1アカウント1作品）`);
-            }
+            const isUpdate = !!registry[authorHash];
+            const entryName = isUpdate ? registry[authorHash] : `entry-${issue.number}`;
 
             core.setOutput('title', title);
             core.setOutput('author', author);
@@ -95,6 +81,7 @@ jobs:
             core.setOutput('errors', JSON.stringify(errors));
             core.setOutput('author_hash', authorHash);
             core.setOutput('has_errors', errors.length > 0 ? 'true' : 'false');
+            core.setOutput('is_update', isUpdate ? 'true' : 'false');
 
       - name: Report validation errors
         if: steps.parse.outputs.has_errors == 'true'
@@ -200,11 +187,14 @@ jobs:
           script: |
             const siteUrl = 'https://haukun.github.io/p5js-banon-fireworks/';
 
+            const isUpdate = '${{ steps.parse.outputs.is_update }}' === 'true';
+            const msg = isUpdate ? '更新' : '登録';
+
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: `## ✅ 投稿完了！\n\nあなたの作品が登録されました！\n\n🎆 ギャラリーで見る: ${siteUrl}\n\nデプロイが完了するまで1〜2分お待ちください。\n\n---\n*このIssueは自動クローズされます。*`
+              body: `## ✅ ${msg}完了！\n\nあなたの作品が${msg}されました！\n\n🎆 ギャラリーで見る: ${siteUrl}\n\nデプロイが完了するまで1〜2分お待ちください。\n\n---\n*このIssueは自動クローズされます。*`
             });
 
             await github.rest.issues.update({
