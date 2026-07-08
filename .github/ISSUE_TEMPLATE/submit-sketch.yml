@@ -1,0 +1,55 @@
+name: "🎆 作品を投稿する / Submit a Sketch"
+description: "P5.jsスケッチを投稿してください"
+title: "[Submit] "
+labels: ["submission"]
+body:
+  - type: input
+    id: title
+    attributes:
+      label: "作品タイトル / Title"
+      description: "あなたの作品のタイトル"
+      placeholder: "例: Neon Fireworks"
+    validations:
+      required: true
+
+  - type: input
+    id: author
+    attributes:
+      label: "作者名 / Author"
+      description: "表示される名前（ハンドルネーム可）"
+      placeholder: "例: 太郎"
+    validations:
+      required: true
+
+  - type: input
+    id: entry_name
+    attributes:
+      label: "作品ID / Entry Name"
+      description: "半角英数字、ハイフン、アンダースコアのみ。フォルダ名になります。"
+      placeholder: "例: neon-fireworks"
+    validations:
+      required: true
+
+  - type: textarea
+    id: code
+    attributes:
+      label: "コード / Code"
+      description: |
+        P5.jsスケッチのコードを貼り付けてください。
+        ルール:
+        - createCanvas() は書かないでください（システムが自動設定: 400x800）
+        - frameCount は 1〜600（10秒）で自動停止します
+        - loadImage(), fetch() 等の外部読み込みは禁止です
+      render: javascript
+      placeholder: |
+        function setup() {
+          // 初期化
+        }
+
+        function draw() {
+          background(0);
+          let progress = frameCount / 600;
+          // あなたのアニメーション
+        }
+    validations:
+      required: true

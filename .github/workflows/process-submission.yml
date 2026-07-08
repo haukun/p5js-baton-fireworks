@@ -1,0 +1,243 @@
+name: Process Submission
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    if: contains(github.event.issue.labels.*.name, 'submission')
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Parse submission
+        id: parse
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const body = issue.body || '';
+
+            // Issue formのフィールドを解析
+            function extractField(body, label) {
+              // Issue form format: ### Label\n\nValue\n\n
+              const regex = new RegExp(`### ${label}\\s*\\n\\n([\\s\\S]*?)(?=\\n###|$)`);
+              const match = body.match(regex);
+              return match ? match[1].trim() : '';
+            }
+
+            const title = extractField(body, '作品タイトル / Title');
+            const author = extractField(body, '作者名 / Author');
+            const entryName = extractField(body, '作品ID / Entry Name');
+            let code = extractField(body, 'コード / Code');
+
+            // コードブロックのマーカーを除去
+            code = code.replace(/^```javascript\n?/i, '').replace(/^```js\n?/i, '').replace(/\n?```$/g, '').trim();
+
+            // バリデーション
+            const errors = [];
+
+            if (!title) errors.push('作品タイトルが空です');
+            if (!author) errors.push('作者名が空です');
+            if (!entryName) errors.push('作品IDが空です');
+            if (!code) errors.push('コードが空です');
+
+            if (entryName && !/^[a-zA-Z0-9_-]+$/.test(entryName)) {
+              errors.push('作品IDは半角英数字、ハイフン、アンダースコアのみ使用可能です');
+            }
+
+            // ファイルサイズチェック
+            if (code && code.length > 51200) {
+              errors.push('コードが50KBを超えています');
+            }
+
+            // 禁止パターンチェック
+            const bannedPatterns = [
+              /\bfetch\s*\(/,
+              /XMLHttpRequest/,
+              /\bimport\s/,
+              /\brequire\s*\(/,
+              /\beval\s*\(/,
+              /\bFunction\s*\(/,
+              /window\.open/,
+              /createCanvas\s*\(/,
+              /__userFrameCount/,
+              /__drawEnabled/,
+              /__waiting/,
+              /__frameOffset/,
+              /__p5c_setup__/,
+              /__p5c_draw__/,
+            ];
+
+            for (const pattern of bannedPatterns) {
+              if (pattern.test(code)) {
+                errors.push(`禁止パターンが検出されました: ${pattern}`);
+              }
+            }
+
+            // 既存エントリーとの重複チェック
+            const fs = require('fs');
+            const path = require('path');
+            const entriesDir = path.join(process.cwd(), 'entries');
+            if (entryName && fs.existsSync(path.join(entriesDir, entryName))) {
+              errors.push(`作品ID "${entryName}" は既に使用されています。別の名前を選んでください。`);
+            }
+
+            // 1人1作品チェック
+            const registryPath = path.join(process.cwd(), '.registry.json');
+            const registry = fs.existsSync(registryPath) 
+              ? JSON.parse(fs.readFileSync(registryPath, 'utf-8')) 
+              : {};
+            const crypto = require('crypto');
+            const authorHash = crypto.createHash('sha256').update(issue.user.login).digest('hex');
+            
+            if (registry[authorHash]) {
+              errors.push(`このアカウントは既に作品を投稿済みです（1アカウント1作品）。既存: ${registry[authorHash]}`);
+            }
+
+            core.setOutput('title', title);
+            core.setOutput('author', author);
+            core.setOutput('entry_name', entryName);
+            core.setOutput('code', code);
+            core.setOutput('errors', JSON.stringify(errors));
+            core.setOutput('author_hash', authorHash);
+            core.setOutput('has_errors', errors.length > 0 ? 'true' : 'false');
+
+      - name: Report validation errors
+        if: steps.parse.outputs.has_errors == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const errors = JSON.parse('${{ steps.parse.outputs.errors }}'.replace(/'/g, "\\'"));
+            const body = `## ❌ バリデーションエラー\n\n以下の問題を修正して、新しいIssueを作成してください:\n\n${errors.map(e => `- ${e}`).join('\n')}\n\n---\n*このIssueは自動クローズされます。*`;
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: body
+            });
+
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              state: 'closed',
+              labels: ['submission', 'invalid']
+            });
+
+      - name: Create entry file
+        if: steps.parse.outputs.has_errors == 'false'
+        run: |
+          ENTRY_NAME="${{ steps.parse.outputs.entry_name }}"
+          TITLE="${{ steps.parse.outputs.title }}"
+          AUTHOR="${{ steps.parse.outputs.author }}"
+
+          mkdir -p "entries/${ENTRY_NAME}"
+
+          # ヘッダー + コード
+          cat > "entries/${ENTRY_NAME}/sketch.js" << 'SKETCH_EOF'
+          // ============================================================
+          SKETCH_EOF
+
+          # メタデータを追加
+          echo "const TITLE = \"${TITLE}\";" >> "entries/${ENTRY_NAME}/sketch.js"
+          echo "const AUTHOR = \"${AUTHOR}\";" >> "entries/${ENTRY_NAME}/sketch.js"
+          echo "// ============================================================" >> "entries/${ENTRY_NAME}/sketch.js"
+          echo "" >> "entries/${ENTRY_NAME}/sketch.js"
+
+          # コードを追加（ヒアドキュメントでNode.jsから書き出し）
+          node -e "
+            const fs = require('fs');
+            const code = Buffer.from('${{ steps.parse.outputs.code }}', 'base64').toString('utf-8') || '';
+            fs.appendFileSync('entries/${ENTRY_NAME}/sketch.js', code);
+          " 2>/dev/null || true
+
+      - name: Write code from issue
+        if: steps.parse.outputs.has_errors == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const entryName = '${{ steps.parse.outputs.entry_name }}';
+            const title = `${{ steps.parse.outputs.title }}`;
+            const author = `${{ steps.parse.outputs.author }}`;
+            
+            const issue = context.payload.issue;
+            const body = issue.body || '';
+
+            // コードを再抽出
+            function extractField(body, label) {
+              const regex = new RegExp(`### ${label}\\s*\\n\\n([\\s\\S]*?)(?=\\n###|$)`);
+              const match = body.match(regex);
+              return match ? match[1].trim() : '';
+            }
+            let code = extractField(body, 'コード / Code');
+            code = code.replace(/^```javascript\n?/i, '').replace(/^```js\n?/i, '').replace(/\n?```$/g, '').trim();
+
+            const dir = path.join('entries', entryName);
+            fs.mkdirSync(dir, { recursive: true });
+
+            const content = `// ============================================================\nconst TITLE = "${title}";\nconst AUTHOR = "${author}";\n// ============================================================\n\n${code}\n`;
+            fs.writeFileSync(path.join(dir, 'sketch.js'), content);
+
+      - name: Update registry
+        if: steps.parse.outputs.has_errors == 'false'
+        run: |
+          ENTRY_NAME="${{ steps.parse.outputs.entry_name }}"
+          AUTHOR_HASH="${{ steps.parse.outputs.author_hash }}"
+
+          node -e "
+            const fs = require('fs');
+            const reg = JSON.parse(fs.readFileSync('.registry.json', 'utf-8'));
+            reg['${AUTHOR_HASH}'] = '${ENTRY_NAME}';
+            fs.writeFileSync('.registry.json', JSON.stringify(reg, null, 2) + '\n');
+          "
+
+      - name: Build entries.json
+        if: steps.parse.outputs.has_errors == 'false'
+        run: node scripts/build-entries.js
+
+      - name: Commit and push
+        if: steps.parse.outputs.has_errors == 'false'
+        run: |
+          ENTRY_NAME="${{ steps.parse.outputs.entry_name }}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add entries/ .registry.json viewer-fireworks/entries.json
+          git commit -m "Add entry: ${ENTRY_NAME} (via issue #${{ github.event.issue.number }})"
+          git push
+
+      - name: Close issue with success
+        if: steps.parse.outputs.has_errors == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const entryName = '${{ steps.parse.outputs.entry_name }}';
+            const siteUrl = 'https://haukun.github.io/p5js-banon-fireworks/';
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `## ✅ 投稿完了！\n\nあなたの作品が登録されました！\n\n🎆 ギャラリーで見る: ${siteUrl}\n\nデプロイが完了するまで1〜2分お待ちください。\n\n---\n*このIssueは自動クローズされます。*`
+            });
+
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              state: 'closed',
+              labels: ['submission', 'accepted']
+            });
