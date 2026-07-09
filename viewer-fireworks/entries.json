@@ -1,11 +1,5 @@
 [
   {
-    "id": "entry-2",
-    "title": "3Dテスト",
-    "author": "haukun",
-    "icon": "icon.png"
-  },
-  {
     "id": "example-1",
     "title": "First Fireworks",
     "author": "p5js baton project"
