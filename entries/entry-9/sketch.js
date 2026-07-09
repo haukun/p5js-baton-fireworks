@@ -1,6 +1,6 @@
 // ============================================================
 const TITLE = "テスト";
-const AUTHOR = "haukun";
+const AUTHOR = "Haukun";
 // ============================================================
 
 function setup() {
@@ -9,5 +9,5 @@ function setup() {
 
 function draw() {
   background(220);
-  a= 1 / 
+  while(1){}
 }
