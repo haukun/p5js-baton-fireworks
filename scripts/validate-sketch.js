@@ -42,6 +42,16 @@ async function main() {
 
   const safeCode = transformedCode.replace(/<\/script>/g, '<\\/script>');
 
+  // 構文チェック（Puppeteer実行前に検出）
+  try {
+    new Function(transformedCode);
+  } catch (e) {
+    if (e instanceof SyntaxError) {
+      console.error(`❌ 構文エラー: ${e.message}`);
+      process.exit(1);
+    }
+  }
+
   const html = `<!DOCTYPE html>
 <html>
 <head>
@@ -104,6 +114,12 @@ async function main() {
     page.setDefaultTimeout(TIMEOUT_MS);
     page.setDefaultNavigationTimeout(TIMEOUT_MS);
 
+    // ページ内エラーを記録
+    let pageErrors = [];
+    page.on('pageerror', (err) => {
+      pageErrors.push(err.message);
+    });
+
     // HTML をロード
     await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: TIMEOUT_MS });
 
@@ -118,8 +134,13 @@ async function main() {
     process.exit(0);
   } catch (e) {
     if (e.message.includes('timeout') || e.message.includes('Timeout')) {
-      console.error('❌ タイムアウト: 作品が正常終了しませんでした。');
-      console.error('   高負荷の処理があるか、無限ループの可能性があります。');
+      if (pageErrors.length > 0) {
+        console.error('❌ 実行時エラー:');
+        pageErrors.forEach(err => console.error('   ' + err));
+      } else {
+        console.error('❌ タイムアウト: 作品が正常終了しませんでした。');
+        console.error('   高負荷の処理があるか、無限ループの可能性があります。');
+      }
     } else {
       console.error(`❌ スケッチ実行エラー: ${e.message}`);
     }

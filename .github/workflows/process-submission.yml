@@ -159,18 +159,24 @@ jobs:
         continue-on-error: true
         run: |
           ENTRY_NAME="${{ steps.parse.outputs.entry_name }}"
-          xvfb-run --auto-servernum node scripts/validate-sketch.js "entries/${ENTRY_NAME}/sketch.js"
+          xvfb-run --auto-servernum node scripts/validate-sketch.js "entries/${ENTRY_NAME}/sketch.js" 2>&1 | tee /tmp/sketch-test-output.txt
 
       - name: Report sketch execution failure
         if: steps.parse.outputs.has_errors == 'false' && steps.sketch-test.outcome == 'failure'
         uses: actions/github-script@v7
         with:
           script: |
+            const fs = require('fs');
+            let detail = '';
+            try {
+              detail = fs.readFileSync('/tmp/sketch-test-output.txt', 'utf-8').trim();
+            } catch (e) {}
+            const message = detail || '作品が正常終了しませんでした。';
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: '## ❌ 実行テスト失敗\n\n作品が正常終了しませんでした。高負荷の処理があるか、無限ループの可能性があります。\n\n[Playground](https://haukun.github.io/p5js-baton-fireworks/playground/) でコードの動作を確認し、修正してから再度投稿してください。\n\n---\n*このIssueは自動クローズされます。*'
+              body: `## ❌ 実行テスト失敗\n\n${message}\n\n[Playground](https://haukun.github.io/p5js-baton-fireworks/playground/) でコードの動作を確認し、修正してから再度投稿してください。\n\n---\n*このIssueは自動クローズされます。*`
             });
             await github.rest.issues.update({
               owner: context.repo.owner,
