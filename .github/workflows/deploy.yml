@@ -3,6 +3,7 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -32,6 +33,8 @@ jobs:
           cp -r viewer-fireworks/* _site/viewer-fireworks/
           cp -r entries _site/entries
           cp -r playground _site/playground
+          mkdir -p _site/docs
+          cp docs/guide.html _site/docs/guide.html
           # ルートからviewer-fireworksにリダイレクト
           echo '<meta http-equiv="refresh" content="0;url=viewer-fireworks/">' > _site/index.html
 
