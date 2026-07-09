@@ -242,6 +242,7 @@ jobs:
           mkdir -p _site/viewer-fireworks
           cp -r viewer-fireworks/* _site/viewer-fireworks/
           cp -r entries _site/entries
+          cp -r playground _site/playground
           echo '<meta http-equiv="refresh" content="0;url=viewer-fireworks/">' > _site/index.html
 
       - name: Upload Pages artifact

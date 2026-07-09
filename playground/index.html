@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>p5js花火大会 - Playground</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <div class="main-layout">
+      <div class="editor-panel">
+        <header>
+          <h1>p5js花火大会 Playground</h1>
+          <p class="subtitle">投稿前にスケッチをテストできます。実際のビューアと同じ環境で再生されます。</p>
+        </header>
+        <div class="editor-header">
+          <span>sketch.js</span>
+          <div class="editor-actions">
+            <button id="btn-run" class="btn btn-primary">&#9654; 実行</button>
+            <button id="btn-stop" class="btn btn-secondary">&#9632; 停止</button>
+          </div>
+        </div>
+        <textarea id="code-editor" spellcheck="false" placeholder="ここにスケッチのコードを貼り付けてください...">function setup() {
+  background(0);
+}
+
+function draw() {
+  background(0);
+}</textarea>
+        <div id="validation-result" class="validation-result"></div>
+        <footer>
+          <a href="../viewer-fireworks/">ギャラリーを見る</a>
+          <span class="sep">|</span>
+          <a href="https://github.com/haukun/p5js-baton-fireworks/issues/new?template=submit-sketch.yml">作品を投稿する</a>
+          <span class="sep">|</span>
+          <a href="https://github.com/haukun/p5js-baton-fireworks">GitHub</a>
+        </footer>
+      </div>
+
+      <div class="preview-panel">
+        <div class="preview-header">
+          <span>プレビュー (400 x 800)</span>
+        </div>
+        <div id="phase-bar" class="phase-bar">
+          <span class="phase" data-phase="before">前の作品</span>
+          <span class="phase-arrow">→</span>
+          <span class="phase" data-phase="crossfade1">🔀</span>
+          <span class="phase-arrow">→</span>
+          <span class="phase" data-phase="user">あなたの作品(<span id="frame-counter">000</span>/600)</span>
+          <span class="phase-arrow">→</span>
+          <span class="phase" data-phase="crossfade2">🔀</span>
+          <span class="phase-arrow">→</span>
+          <span class="phase" data-phase="after">次の作品</span>
+        </div>
+        <div class="preview-container">
+          <iframe id="slot-a" class="preview-slot active"></iframe>
+          <iframe id="slot-b" class="preview-slot"></iframe>
+          <div id="overlay" class="overlay">
+            <img id="overlay-icon" class="overlay-icon" alt="">
+            <div class="overlay-text">
+              <div id="overlay-title" class="overlay-title"></div>
+              <div id="overlay-author" class="overlay-author"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="playground.js"></script>
+</body>
+</html>

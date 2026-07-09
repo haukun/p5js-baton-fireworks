@@ -1,234 +1,207 @@
-# P5 Continue - アーキテクチャ & 開発メモ
+# p5js-baton-fireworks (p5js花火大会) - プロジェクト全体像
 
-## プロジェクト概要
+## コンセプト
 
-PWNISHERの「ボールが落ちる」CGコンテストにインスパイアされたP5.jsクリエイティブコーディングリレープラットフォーム。
-参加者が「画面上部中央から何かが現れ、10秒後に画面下部中央に消えていく」P5.jsスケッチを投稿し、ランダムに連続再生されるギャラリーサイト。
+P5.jsで「花火を打ち上げる」10秒間のアニメーション作品を参加者が投稿し、全作品がランダム順にクロスフェードで連続再生されるギャラリーサイト。
 
-現在「花火大会」版（viewer-fireworks: クロスフェード切り替え）が稼働中。
+- 参加者はGit知識不要。GitHub Issueフォームからコードを貼り付けるだけで投稿完了
+- 1〜2分後にサイトへ自動反映される
 
-**リポジトリ**: https://github.com/haukun/p5js-baton-fireworks
+**リポジトリ**: https://github.com/haukun/p5js-baton-fireworks  
 **公開サイト**: https://haukun.github.io/p5js-baton-fireworks/
 
-## 技術スタック
+---
 
-- フロントエンド: 静的HTML + vanilla JS + CSS
-- スケッチ実行: iframe (Blob URL方式)
-- ホスティング: GitHub Pages
-- CI/CD: GitHub Actions (Issue投稿処理 + 自動デプロイ)
-- 投稿方式: GitHub Issue（Git知識不要）
+## スケッチ仕様
 
-## 仕様
-
-### viewer-fireworks（花火大会版、現在稼働中）
 | 項目 | 値 |
 |------|-----|
 | キャンバスサイズ | 400 x 800 px |
 | フレームレート | 60fps |
 | 総フレーム数 | 600 (= 10秒) |
+| 背景 | 黒（花火の演出に最適） |
 | トランジション | クロスフェード (1.5秒) |
 
-### viewer（スクロール版、未稼働）
-| 項目 | 値 |
-|------|-----|
-| キャンバスサイズ | 400 x 720 px |
-| フレームレート | 60fps |
-| 総フレーム数 | 600 (= 10秒) |
-| ステージ全体 | 400 x 800 px (上帯40 + Canvas720 + 下帯40) |
-| トランジション | 上方向スクロール (1秒) |
+### 参加者のルール
+
+- `setup()` と `draw()` を定義する（通常のP5.jsと同じ）
+- `createCanvas()` は書かなくてよい（システムが自動設定）
+- `frameCount` は 1〜600 で自動停止
+- 外部リソース読み込み禁止（loadImage, fetch, XMLHttpRequest等）
+- ネットワーク通信禁止
+
+---
+
+## 技術スタック
+
+| レイヤー | 技術 |
+|----------|------|
+| フロントエンド | 静的HTML + vanilla JS + CSS |
+| スケッチ実行 | iframe内Blob URL |
+| P5.js | v2.3.0 ローカル同梱 (p5.min.js) |
+| ホスティング | GitHub Pages |
+| CI/CD | GitHub Actions |
+| 投稿I/F | GitHub Issue Form |
+
+---
 
 ## ディレクトリ構成
 
 ```
 ├── template/sketch.js              参加者用テンプレート
 ├── entries/
-│   ├── example-bouncing-ball/      サンプル作品1
-│   ├── example-falling-letters/    サンプル作品2
-│   └── entry-N/                    Issue投稿された作品（自動生成）
-├── viewer-fireworks/               花火大会ビューア（デプロイ対象）
+│   ├── example-bouncing-ball/      サンプル作品
+│   │   └── sketch.js
+│   ├── example-falling-letters/    サンプル作品
+│   │   └── sketch.js
+│   └── entry-N/                    投稿された作品（自動生成）
+│       ├── sketch.js
+│       └── icon.png (任意)
+├── viewer-fireworks/               ビューア（デプロイ対象）
 │   ├── index.html
-│   ├── player.js
+│   ├── player.js                   再生制御ロジック
 │   ├── style.css
+│   ├── p5.min.js                   P5.jsライブラリ（ローカル同梱）
 │   └── entries.json                作品一覧（自動生成）
-├── viewer/                         スクロール版ビューア（参考保存）
-│   ├── index.html
-│   ├── player.js
-│   └── style.css
 ├── scripts/
-│   └── build-entries.js            entries.json 生成スクリプト
+│   └── build-entries.js            entries/ → entries.json 生成
 ├── docs/
 │   └── ARCHITECTURE.md             本ドキュメント
-├── .registry.json                  GitHubユーザー登録簿（SHA-256ハッシュ）
+├── .registry.json                  ユーザー → エントリー対応表
 └── .github/
     ├── ISSUE_TEMPLATE/
     │   ├── submit-sketch.yml       投稿フォーム
     │   ├── delete-sketch.yml       削除フォーム
     │   └── config.yml              空Issue禁止
     └── workflows/
-        ├── process-submission.yml  投稿処理（新規＋上書き更新）＋デプロイ
-        ├── manage-submission.yml   削除処理＋デプロイ
+        ├── process-submission.yml  投稿処理 + デプロイ
+        ├── manage-submission.yml   削除処理 + デプロイ
         ├── deploy.yml              pushトリガーのデプロイ
-        └── validate.yml            PR時バリデーション（PR方式の場合）
+        └── validate.yml            PR時バリデーション
 ```
 
 ---
 
-## 投稿システム設計
+## 投稿フロー
 
-### Issue投稿方式（現在の方式）
+```
+参加者 → Issue Form (作品提出) → GitHub Actions (process-submission.yml)
+  ├── バリデーション（禁止API・サイズ等）
+  ├── 失敗 → Issueにエラーコメント & クローズ
+  └── 成功
+      ├── entries/entry-{番号}/sketch.js 作成
+      ├── アイコン画像ダウンロード（任意）
+      ├── .registry.json 更新
+      ├── entries.json 再生成
+      ├── git commit & push
+      ├── GitHub Pages デプロイ
+      └── Issueに成功コメント & クローズ
+```
 
-参加者はGit操作不要。GitHub Issueのフォームに入力するだけ。
-
-**投稿フロー:**
-1. 参加者が https://github.com/haukun/p5js-baton-fireworks/issues/new/choose を開く
-2. 「🎆 作品を投稿する」を選択
-3. 作品タイトル・作者名・コードを入力して Submit
-4. GitHub Actionsが自動処理:
-   - バリデーション（禁止API、サイズ制限等）
-   - 既に投稿済み → 既存entryを上書き更新
-   - 新規 → `entries/entry-{Issue番号}/sketch.js` を作成
-   - registryに登録
-   - entries.jsonを再生成
-   - GitHub Pagesにデプロイ
-   - Issueにコメント＆クローズ
-5. 1〜2分後にサイトに反映
-
-**更新フロー:**
-- 同じユーザーが再度「作品を投稿する」で投稿 → 既存作品を上書き
-- タイトル・作者名・コード全て変更可能
-
-**削除フロー:**
-1. 「🗑️ 作品を削除する」を選択
-2. 確認チェック → Submit
-3. 自分の作品のみ削除される（registryからも削除、再投稿可能に）
-
-### Issue Formの注意点
-
-- GitHubのIssue Formでは「Add a title」欄を消せない
-- `title: "作品提出"` でプレフィルし、ワークフローは `issue.title == '作品提出'` で判定
-- ラベルベースの判定は**ラベルが事前に存在しないと付与されない**ため不採用
-
-### GITHUB_TOKENによるpushの制限
-
-- GitHub Actionsの`GITHUB_TOKEN`でpushしたコミットは**別のワークフローをトリガーしない**
-- 対策: `process-submission.yml`内でデプロイステップまで含める（deploy.ymlに頼らない）
+- **更新**: 同一ユーザーが再投稿 → 既存エントリーを上書き
+- **削除**: 「作品を削除する」Issue → 自作品のみ削除、再投稿可能に
 
 ---
 
-## ビューア設計
+## ビューア設計 (viewer-fireworks)
+
+### 再生の流れ
+
+1. `entries.json` を読み込み、シャッフル
+2. 作品のsketch.jsをfetchし、Blob URLとしてiframeに読み込む
+3. 600フレーム完了 → iframe から `sketch-complete` を postMessage
+4. 次の作品を裏のiframeにロード → クロスフェード (1.5秒)
+5. 全作品再生後、再シャッフルしてループ
 
 ### iframe + Blob URL方式
 
-各スケッチは独立したiframe内で実行される。iframe内にBlob URLで生成したHTMLを読み込む。
-
-**Blob URL方式を採用した理由:**
-- 別ファイル（runner.html）方式だとP5.jsのCDN読み込みタイミングの制御が困難
-- グローバルモードのP5.jsが`setup()`/`draw()`をDOMContentLoaded後に自動検出するため、postMessageでコードを後から注入する方式では動かなかった
-- Blob URLならHTMLを丸ごと生成できるので、参加者のコードをインラインで埋め込める
-
-### setup/draw のリネーム手法
-
-参加者は通常の`setup()`/`draw()`でコードを書く（ローカルデバッグ可能）。
-ビューア読み込み時にシステムが以下の変換を行う:
-
-```javascript
-code.replace(/function\s+setup\s*\(/g, 'function __p5c_setup__(')
-    .replace(/function\s+draw\s*\(/g, 'function __p5c_draw__(')
-    .replace(/createCanvas\s*\([^)]*\)\s*;?/g, '// createCanvas removed by system')
-```
-
-- `setup`/`draw` → `__p5c_setup__`/`__p5c_draw__` にリネーム
-- `createCanvas(...)` は自動除去（参加者はローカルで書いたままコピペできる）
-- システムが本物の`setup()`/`draw()`を定義し、ライフサイクルを完全制御
+- 参加者コードの `setup`/`draw` を内部名 (`__p5c_setup__`/`__p5c_draw__`) にリネーム
+- `createCanvas()` を自動除去
+- システムが本物の `setup()`/`draw()` を定義し、フレームカウント・停止を制御
+- p5.min.js をインラインで埋め込み（CDN依存なし）
 
 ### frameCount管理
 
 ```javascript
 var __userFrameCount = 0;
 function draw() {
-  if (!__drawEnabled) return;  // 待機中は何もしない
+  if (!__drawEnabled) return;
   __userFrameCount++;
   frameCount = __userFrameCount;  // 参加者には1〜600が見える
   if (typeof __p5c_draw__ === 'function') __p5c_draw__();
+  if (__userFrameCount >= 600) {
+    noLoop();
+    window.parent.postMessage({ type: 'sketch-complete' }, '*');
+  }
 }
 ```
 
-- P5.js内部のframeCountとは独立
-- 待機中（`__drawEnabled = false`）は`__userFrameCount`が増えない
-- トランジッションの遅延に関係なく、参加者のコードは必ずframeCount=1から600で動作
-- ブラウザが重くて実時間12秒かかっても、draw2()は必ず600回呼ばれてからトランジション
+### postMessageの制約
 
-### viewer-fireworks: クロスフェード方式
-
-- 2つのiframeを`position: absolute`で重ねて配置
-- CSS `opacity` トランジション（1.5秒）でクロスフェード
-- 現在のスケッチ完了 → 次のスケッチを裏で読み込み+setup実行 → 0.5秒後にクロスフェード開始
-- 花火は背景黒なので、クロスフェード中に両方が透けて重なるのも演出として有効
-
-### viewer: スクロール方式のトランジッション
-
-1. 現在のスケッチが600フレーム完了 → `sketch-complete`メッセージ
-2. 現在のCanvasにフェードアウト（CSS opacity, 0.5秒）
-3. 次のスケッチをnextSlotに読み込み（paused=true）
-4. iframe内: `setup()` → `__p5c_setup__()` 実行（背景描画）→ 親に`setup-complete`通知
-5. 親が`setup-complete`受信（または2秒タイムアウト）→ スクロール開始（1秒）
-6. スクロール完了 → iframe内タイマーで`__drawEnabled = true`
-7. `draw()` → `__p5c_draw__()` 開始
-
-### postMessageの制限事項
-
-Blob URLのiframeへの`postMessage`は**信頼できない**ことが判明:
-- 親→子の`postMessage`がBlobオリジン(`null`)のiframeに届かないケースがある
-- 解決策: **子（iframe）→親へのpostMessageは動作する**ので、通知は子→親のみ使用
-- 子の制御（draw開始タイミング等）は**`setTimeout`で自己管理**させる
-
-### 帯（divider bar）デザイン（スクロール版）
-
-- 上帯(`bar-top`): 暗灰色→黒のグラデーション。上端に細いライン
-- 下帯(`bar-bottom`): 黒→暗灰色のグラデーション。下端に細いライン
-- 2つが隣接すると1つの帯に見える
-- 通過アニメーション: `::before`疑似要素でグラデーションが上→下に流れる
-- 上帯は`animation-delay: 0.25s`で下帯の後に連続して発火（1本に見える）
-- アニメーション回数制御: `infinite`ではなく、**3回分を1つの`@keyframes`に焼き込み`forwards`で停止**（半端な4回目が始まるのを防止）
-- アニメーションの色はランダム（CSS変数 `--glow-color-1/2/3` をJSで設定）
-- アニメーションはスケッチ再生中は停止、トランジション中のみ発火
+- 親→子は Blob URL オリジン(`null`)のため信頼できない
+- **子→親のみ使用**（sketch-complete, setup-complete）
+- 子の制御（draw開始タイミング等）は `setTimeout` で自己管理
 
 ---
 
-## セキュリティ設計
+## セキュリティ
 
 ### 1人1作品の制御
 
-- `.registry.json`にGitHubユーザー名のSHA-256ハッシュ → ディレクトリ名の対応を記録
-- 投稿時にハッシュを照合: 既存なら上書き、なければ新規
-- ハッシュのため、公開リポジトリでもGitHubユーザー名の逆引きは困難
-- 削除時にregistryからエントリーを削除 → 再投稿可能に
+- `.registry.json`: GitHubユーザー名のSHA-256ハッシュ → ディレクトリ名
+- 投稿時にハッシュ照合: 既存なら上書き、なければ新規
+- ハッシュのため公開リポジトリでもユーザー名の逆引き困難
 
-### 作品の保護
+### バリデーション (投稿時)
 
-- リポジトリへの直接pushは管理者のみ可能
-- 外部ユーザーはIssue経由でのみ操作可能
-- ワークフローはGitHubユーザーハッシュで本人確認するため、他人の作品は操作不可
+- 禁止API: fetch, XMLHttpRequest, import, require, eval, Function, window.open, WebSocket, EventSource, RTCPeerConnection, sendBeacon, AudioContext
+- システム内部変数アクセス禁止: `__userFrameCount`, `__drawEnabled`, `__p5c_setup__`, `__p5c_draw__` 等
+- ファイルサイズ: 50KB以下
+- JavaScript構文チェック (PR方式の場合)
 
-### スケッチのバリデーション
+### iframe内サンドボックス
 
-- TITLE/AUTHOR定数の存在チェック（PR方式の場合）
-- `createCanvas()` はシステムが自動除去（禁止ではない）
-- 禁止API検出: fetch, XMLHttpRequest, import, require, eval, Function, window.open
-- システム内部変数へのアクセス禁止: `__userFrameCount`, `__drawEnabled`, `__waiting`, `__frameOffset`, `__p5c_setup__`, `__p5c_draw__`
-- JavaScript構文チェック（node --check、PR方式の場合）
-- ファイルサイズ50KB以下
-
-### iframe内のサンドボックス
-
-- `window.fetch = undefined` / `window.XMLHttpRequest = undefined` で無効化
-- Blob URLのiframeは別オリジンのため、親ページのDOMにはアクセス不可
+- 危険なAPIを `undefined` で上書き (fetch, XMLHttpRequest, WebSocket, alert, open等)
+- Blob URLのiframeは別オリジン → 親DOMにアクセス不可
 
 ---
 
-## 開発Tips
+## デプロイ
 
-### ローカル開発
+### GitHub Pages構成
+
+```
+_site/
+├── index.html              → viewer-fireworks/ へリダイレクト
+├── viewer-fireworks/       ← viewer-fireworks/ の中身をコピー
+│   ├── index.html
+│   ├── player.js
+│   ├── style.css
+│   ├── p5.min.js
+│   └── entries.json
+└── entries/                ← entries/ をそのままコピー
+    ├── entry-2/
+    │   ├── sketch.js
+    │   └── icon.png
+    └── ...
+```
+
+### デプロイトリガー
+
+| ワークフロー | トリガー | 用途 |
+|---|---|---|
+| process-submission.yml | Issue作成 (タイトル="作品提出") | 投稿処理 + デプロイ |
+| manage-submission.yml | Issue作成 (タイトル="作品削除") | 削除処理 + デプロイ |
+| deploy.yml | main へ push | 通常のデプロイ |
+
+### 注意: GITHUB_TOKEN の制限
+
+- `GITHUB_TOKEN` でpushしたコミットは別ワークフローをトリガーしない
+- そのため process-submission / manage-submission 内にデプロイステップを含めている
+
+---
+
+## ローカル開発
 
 ```bash
 # entries.json生成
@@ -237,30 +210,11 @@ node scripts/build-entries.js
 # サーバー起動（キャッシュ無効）
 npx http-server . -p 3000 --cors -c-1
 
-# ブラウザで開く
-# 花火版: http://localhost:3000/viewer-fireworks/
-# スクロール版: http://localhost:3000/viewer/
+# ブラウザ
+# http://localhost:3000/viewer-fireworks/
 ```
 
-**重要**: `http-server`はデフォルトで3600秒キャッシュする。開発中は必ず`-c-1`を付ける。
-
-### sketch.jsの変更が反映されない場合
-
-1. サーバーが`-c-1`で起動されているか確認
-2. ブラウザのCtrl+Shift+Rでハードリロード
-3. player.jsのfetch URLにキャッシュバスター(`?t=${Date.now()}`)が付いていることを確認（開発用。本番ではデプロイ時にentries.jsonが更新されるので不要）
-
-### P5.jsグローバルモードの注意点
-
-- P5.jsはsetup()後に必ずdraw()を1回呼ぶ（noLoop()していても）
-- 対策: draw()の先頭で待機フラグをチェックして即return
-- setup()で宣言したグローバル変数はdraw()から参照可能（同一スクリプト内のため）
-
-### GitHub Pages デプロイパス
-
-- viewer-fireworksの中身がサイトルートに展開される
-- entries/もルート直下にコピーされる
-- player.jsのfetchパスは `entries/${id}/sketch.js`（`../`ではない）
+**注意**: http-serverはデフォルト3600秒キャッシュ。開発中は必ず `-c-1` を付ける。
 
 ---
 
@@ -273,8 +227,8 @@ npx http-server . -p 3000 --cors -c-1
 
 ## 今後の拡張案
 
-- プレビュー生成（Puppeteer + スクリーンショット/GIF）— 規模が大きくなったら
-- いいね/お気に入り機能 — GitHub Starやリアクションを活用?
-- テーマ別コンテスト — 期間限定でテーマを設定
-- 音楽連動 — BGMに合わせてスケッチ切り替えタイミングを同期
-- PR方式の復活 — Git上級者向けの並行投稿経路
+- プレビュー生成（Puppeteer + スクリーンショット/GIF）
+- いいね/お気に入り機能
+- テーマ別コンテスト（期間限定テーマ）
+- 音楽連動（BGMに合わせてスケッチ切り替え）
+- PR方式の復活（Git上級者向け）

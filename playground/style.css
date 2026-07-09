@@ -1,0 +1,304 @@
+/* ============================================================
+   p5js花火大会 - Playground
+   ============================================================ */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+  background: #1a1a2e;
+  color: #e0e0e0;
+  min-height: 100vh;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+header {
+  margin-bottom: 12px;
+}
+
+header h1 {
+  font-size: 1.4rem;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.subtitle {
+  font-size: 0.85rem;
+  color: #aaa;
+}
+
+/* レイアウト */
+.main-layout {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+@media (max-width: 900px) {
+  .main-layout {
+    flex-direction: column;
+    align-items: center;
+  }
+}
+
+/* エディタパネル */
+.editor-panel {
+  flex: 1;
+  min-width: 0;
+  max-width: 560px;
+}
+
+.editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #2a2a40;
+  padding: 8px 12px;
+  border-radius: 8px 8px 0 0;
+  font-size: 0.85rem;
+  color: #ccc;
+}
+
+.editor-actions {
+  display: flex;
+  gap: 8px;
+}
+
+#code-editor {
+  width: 100%;
+  height: 480px;
+  background: #16162a;
+  color: #e8e8e8;
+  border: 1px solid #333;
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  padding: 12px;
+  font-family: 'Fira Code', 'Consolas', 'Monaco', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+  tab-size: 2;
+  outline: none;
+}
+
+#code-editor:focus {
+  border-color: #5588ff;
+}
+
+/* ボタン */
+.btn {
+  border: none;
+  padding: 6px 14px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.15s;
+}
+
+.btn-primary {
+  background: #4488ff;
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: #5599ff;
+}
+
+.btn-secondary {
+  background: #444;
+  color: #ddd;
+}
+
+.btn-secondary:hover {
+  background: #555;
+}
+
+/* バリデーション結果 */
+.validation-result {
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  min-height: 20px;
+}
+
+.validation-result.error {
+  background: #3a1a1a;
+  border: 1px solid #882222;
+  color: #ff8888;
+}
+
+.validation-result.success {
+  background: #1a3a1a;
+  border: 1px solid #228822;
+  color: #88ff88;
+}
+
+/* プレビューパネル */
+.preview-panel {
+  flex-shrink: 0;
+}
+
+.preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #2a2a40;
+  padding: 8px 12px;
+  border-radius: 8px 8px 0 0;
+  font-size: 0.85rem;
+  color: #ccc;
+  max-width: 400px;
+}
+
+/* フェーズバー */
+.phase-bar {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: #1e1e30;
+  padding: 6px 8px;
+  font-size: 0.68rem;
+  color: #666;
+  border-left: 1px solid #333;
+  border-right: 1px solid #333;
+  white-space: nowrap;
+  overflow: hidden;
+  max-width: 400px;
+}
+
+.phase-bar .phase {
+  padding: 2px 6px;
+  border-radius: 3px;
+  transition: background 0.3s, color 0.3s;
+}
+
+.phase-bar .phase.active {
+  background: #4488ff;
+  color: #fff;
+}
+
+.phase-bar .phase-arrow {
+  color: #555;
+  font-size: 0.7rem;
+}
+
+.preview-container {
+  position: relative;
+  width: 400px;
+  height: 800px;
+  background: #000;
+  border: 1px solid #333;
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  overflow: hidden;
+}
+
+.preview-slot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+  opacity: 0;
+  transition: opacity 1.5s ease;
+  pointer-events: none;
+}
+
+.preview-slot.active {
+  opacity: 1;
+  z-index: 1;
+}
+
+.preview-slot.fading-out {
+  opacity: 0;
+  z-index: 0;
+}
+
+/* オーバーレイ */
+.overlay {
+  position: absolute;
+  bottom: 60px;
+  left: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  gap: 12px;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.overlay.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.overlay-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  display: none;
+}
+
+.overlay-icon.show {
+  display: block;
+}
+
+.overlay-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.overlay-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
+  margin-bottom: 4px;
+}
+
+.overlay-author {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.8);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+}
+
+/* フッター */
+footer {
+  margin-top: 12px;
+  font-size: 0.85rem;
+  color: #888;
+}
+
+footer a {
+  color: #88bbff;
+  text-decoration: none;
+}
+
+footer a:hover {
+  text-decoration: underline;
+}
+
+.sep {
+  margin: 0 8px;
+  color: #555;
+}
