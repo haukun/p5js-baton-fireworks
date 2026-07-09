@@ -426,7 +426,7 @@ function draw() {
     overlay.classList.add('visible');
     setTimeout(() => {
       overlay.classList.remove('visible');
-    }, 3000);
+    }, 6000);
   }
 
   init();
