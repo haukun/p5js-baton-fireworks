@@ -158,6 +158,7 @@ jobs:
         if: steps.parse.outputs.has_errors == 'false'
         continue-on-error: true
         run: |
+          set -o pipefail
           ENTRY_NAME="${{ steps.parse.outputs.entry_name }}"
           xvfb-run --auto-servernum node scripts/validate-sketch.js "entries/${ENTRY_NAME}/sketch.js" 2>&1 | tee /tmp/sketch-test-output.txt
 
