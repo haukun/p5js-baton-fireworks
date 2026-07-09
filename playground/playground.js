@@ -26,6 +26,15 @@
     { pattern: /sendBeacon/, label: 'sendBeacon' },
     { pattern: /AudioContext/, label: 'AudioContext' },
     { pattern: /webkitAudioContext/, label: 'webkitAudioContext' },
+    { pattern: /\bloadImage\s*\(/, label: 'loadImage()' },
+    { pattern: /\bloadSound\s*\(/, label: 'loadSound()' },
+    { pattern: /\bloadFont\s*\(/, label: 'loadFont()' },
+    { pattern: /\bloadJSON\s*\(/, label: 'loadJSON()' },
+    { pattern: /\bloadStrings\s*\(/, label: 'loadStrings()' },
+    { pattern: /\bloadTable\s*\(/, label: 'loadTable()' },
+    { pattern: /\bloadBytes\s*\(/, label: 'loadBytes()' },
+    { pattern: /\bloadModel\s*\(/, label: 'loadModel()' },
+    { pattern: /\bloadShader\s*\(/, label: 'loadShader()' },
     { pattern: /__userFrameCount/, label: '__userFrameCount' },
     { pattern: /__drawEnabled/, label: '__drawEnabled' },
     { pattern: /__waiting/, label: '__waiting' },
@@ -326,7 +335,7 @@ function draw() {
 <html>
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'none'; connect-src 'none'; font-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval'; style-src 'unsafe-inline'; img-src blob: data:; connect-src 'none'; font-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none';">
   <style>
     body, html { margin: 0; padding: 0; overflow: hidden; background: #000; }
     canvas { display: block; }

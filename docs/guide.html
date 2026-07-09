@@ -222,10 +222,11 @@
       <li>公序良俗に反する表現</li>
       <li>以下のAPIは使用禁止です。コードに含まれていると投稿が拒否されます。また、万が一通過しても実行時にシステムで無効化されているため動作しません。
         <ul class="nested">
-          <li><code>loadImage()</code>, <code>loadSound()</code> など外部ファイルの読み込み</li>
-          <li><code>fetch()</code>, <code>XMLHttpRequest</code> などネットワーク通信</li>
+          <li><code>loadImage()</code>, <code>loadSound()</code>, <code>loadFont()</code> など外部ファイルの読み込み</li>
+          <li><code>fetch()</code>, <code>XMLHttpRequest</code>, <code>WebSocket</code> などネットワーク通信</li>
           <li><code>eval()</code>, <code>Function()</code> などの動的コード実行</li>
           <li><code>import</code>, <code>require</code> によるモジュール読み込み</li>
+          <li><code>window.open()</code>, <code>AudioContext</code> などブラウザAPI</li>
         </ul>
       </li>
     </ul>

@@ -216,10 +216,11 @@
       <li>Content that violates public decency</li>
       <li>The following APIs are prohibited. Code containing them will be rejected on submission. Even if they pass, they are disabled at runtime:
         <ul class="nested">
-          <li><code>loadImage()</code>, <code>loadSound()</code> and other external file loading</li>
-          <li><code>fetch()</code>, <code>XMLHttpRequest</code> and other network communication</li>
+          <li><code>loadImage()</code>, <code>loadSound()</code>, <code>loadFont()</code> and other external file loading</li>
+          <li><code>fetch()</code>, <code>XMLHttpRequest</code>, <code>WebSocket</code> and other network communication</li>
           <li><code>eval()</code>, <code>Function()</code> and other dynamic code execution</li>
           <li><code>import</code>, <code>require</code> module loading</li>
+          <li><code>window.open()</code>, <code>AudioContext</code> and other browser APIs</li>
         </ul>
       </li>
     </ul>

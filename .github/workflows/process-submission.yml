@@ -59,6 +59,9 @@ jobs:
               /\beval\s*\(/, /\bFunction\s*\(/, /window\.open/,
               /WebSocket/, /EventSource/, /RTCPeerConnection/, /sendBeacon/,
               /AudioContext/, /webkitAudioContext/,
+              /\bloadImage\s*\(/, /\bloadSound\s*\(/, /\bloadFont\s*\(/,
+              /\bloadJSON\s*\(/, /\bloadStrings\s*\(/, /\bloadTable\s*\(/,
+              /\bloadBytes\s*\(/, /\bloadModel\s*\(/, /\bloadShader\s*\(/,
               /__userFrameCount/, /__drawEnabled/, /__waiting/,
               /__frameOffset/, /__p5c_setup__/, /__p5c_draw__/,
             ];
