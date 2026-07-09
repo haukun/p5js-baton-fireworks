@@ -13,7 +13,7 @@ const path = require('path');
 const CANVAS_WIDTH = 400;
 const CANVAS_HEIGHT = 800;
 const TOTAL_FRAMES = 600;
-const TIMEOUT_MS = 20000; // 20秒タイムアウト
+const TIMEOUT_MS = 30000; // 30秒タイムアウト
 
 async function main() {
   const sketchPath = process.argv[2];
@@ -90,7 +90,7 @@ async function main() {
   try {
     browser = await puppeteer.launch({
       headless: 'new',
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu']
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--use-gl=angle', '--use-angle=swiftshader']
     });
 
     const page = await browser.newPage();

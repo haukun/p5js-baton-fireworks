@@ -31,11 +31,8 @@ body:
     attributes:
       label: "コード / Code"
       description: |
-        P5.jsスケッチのコードを貼り付けてください。 / Paste your p5.js sketch code below.
-        ルール / Rules:
-        - createCanvas() は書かなくてOK（システムが自動設定: 400x800） / createCanvas() is optional (auto-set to 400x800)
-        - frameCount は 1〜600（10秒）で自動停止します / frameCount runs 1-600 (10 sec) then auto-stops
-        - loadImage(), fetch() 等の外部読み込みは禁止です / External loading (loadImage, fetch, etc.) is prohibited
+        [Playground](https://haukun.github.io/p5js-baton-fireworks/playground/)で動作確認してから提出してください。また[禁止事項はこちら](https://haukun.github.io/p5js-baton-fireworks/docs/guide.html#prohibited)になります。
+        Please test in the [Playground](https://haukun.github.io/p5js-baton-fireworks/playground/) before submitting. See [prohibited items](https://haukun.github.io/p5js-baton-fireworks/docs/guide-en.html#prohibited).
       render: javascript
       placeholder: |
         function setup() {
@@ -56,9 +53,9 @@ body:
       description: |
         作品のアイコン画像をここにドラッグ＆ドロップまたはペーストしてください（任意）。
         PNG/JPG/GIF、200KB以下。ビューアで作品名の横に表示されます。
-        アップロード後、入力欄の内容が ![ファイル名](https://github.com/user-attachments/...) のような文字列に自動で置き換われば成功です。
+        アップロード後、入力欄の内容が `<img src="https://...">` のような文字列に自動で置き換われば成功です。
         Drag & drop or paste an icon image here (optional). PNG/JPG/GIF, max 200KB. Displayed next to your work title.
-        After upload, the field will automatically change to something like ![filename](https://github.com/user-attachments/...) — that means it worked.
+        After upload, the field will automatically change to something like `<img src="https://...">` — that means it worked.
       placeholder: "ここに画像をドラッグ＆ドロップ / Drag & drop image here"
     validations:
       required: false
