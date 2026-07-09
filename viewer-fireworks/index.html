@@ -2,8 +2,8 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>P5 Continue - Fireworks</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>🎆p5js花火大会</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -22,6 +22,35 @@
     <!-- 作品カウンター -->
     <div id="counter"></div>
   </div>
+
+  <script>
+    // 400x800 のステージを画面に収まるようスケール
+    (function() {
+      var stage = document.getElementById('stage');
+      function fit() {
+        var scaleX = window.innerWidth / 400;
+        var scaleY = window.innerHeight / 800;
+        var scale = Math.min(scaleX, scaleY);
+        stage.style.transform = 'scale(' + scale + ')';
+      }
+      fit();
+      window.addEventListener('resize', fit);
+    })();
+  </script>
+  <script>
+    // 400x800 のステージを画面に収まるようスケール
+    (function() {
+      var stage = document.getElementById('stage');
+      function fit() {
+        var scaleX = window.innerWidth / 400;
+        var scaleY = window.innerHeight / 800;
+        var scale = Math.min(scaleX, scaleY);
+        stage.style.transform = 'scale(' + scale + ')';
+      }
+      fit();
+      window.addEventListener('resize', fit);
+    })();
+  </script>
 
   <script src="player.js"></script>
 </body>

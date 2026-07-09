@@ -1,5 +1,5 @@
 // ============================================================
-// P5 Continue - Participant Template
+// P5 Baton - Participant Template
 // ============================================================
 // 以下のメタデータを必ず記入してください / Fill in the metadata below
 const TITLE = "作品タイトル / Your Title";

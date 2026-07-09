@@ -1,5 +1,5 @@
 /* ============================================================
-   P5 Continue - Fireworks Viewer Styles
+   P5 Baton - Fireworks Viewer Styles
    ============================================================ */
 
 * {
@@ -14,24 +14,19 @@ html, body {
   overflow: hidden;
   background: #000;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-/* ステージ */
+/* ステージ: 常に400x800で描画し、JSでスケール制御 */
 #stage {
   position: relative;
   width: 400px;
   height: 800px;
-  margin: 0 auto;
   overflow: hidden;
   background: #000;
-}
-
-@media (max-width: 420px) {
-  #stage {
-    width: 100vw;
-    height: calc(100vw * 2);
-    max-height: 100vh;
-  }
+  transform-origin: center center;
 }
 
 /* iframeスロット: 重ねて配置 */
@@ -60,7 +55,7 @@ html, body {
 /* メタデータオーバーレイ */
 #overlay {
   position: absolute;
-  bottom: 60px;
+  bottom: 40px;
   left: 20px;
   right: 20px;
   z-index: 30;

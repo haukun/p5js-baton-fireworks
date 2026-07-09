@@ -1,5 +1,5 @@
 // ============================================================
-// P5 Continue - Fireworks Viewer (Crossfade)
+// P5 Baton - Fireworks Viewer (Crossfade)
 // ============================================================
 
 (function () {

@@ -70,3 +70,5 @@ body:
       options:
         - label: "投稿したコードは本リポジトリ上で公開されます。編集や削除をしても履歴として残るため、個人情報などをコードに含めないようご注意ください。 / Submitted code will be published on this repository. History remains even after edits or deletion. Do not include personal information."
           required: true
+        - label: "[投稿規約 (SUBMISSION_TERMS.md)](https://github.com/haukun/p5js-baton-fireworks/blob/main/SUBMISSION_TERMS.md) に同意します。 / I agree to the [Submission Terms](https://github.com/haukun/p5js-baton-fireworks/blob/main/SUBMISSION_TERMS.md)."
+          required: true
