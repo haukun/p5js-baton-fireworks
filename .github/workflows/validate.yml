@@ -73,10 +73,8 @@ jobs:
       - name: Check one-entry-per-user limit
         run: |
           PR_AUTHOR="${{ github.event.pull_request.user.login }}"
-          # GitHubユーザー名のSHA-256ハッシュを生成
-          AUTHOR_HASH=$(echo -n "$PR_AUTHOR" | sha256sum | awk '{print $1}')
 
-          echo "PR author hash: $AUTHOR_HASH"
+          echo "PR author: $PR_AUTHOR"
 
           # .registry.json が存在するか確認（base ブランチから取得）
           git show origin/${{ github.event.pull_request.base.ref }}:.registry.json > /tmp/registry.json 2>/dev/null || echo "{}" > /tmp/registry.json
@@ -84,9 +82,9 @@ jobs:
           # 既に登録済みかチェック
           if node -e "
             const reg = require('/tmp/registry.json');
-            if (reg['$AUTHOR_HASH']) {
+            if (reg['$PR_AUTHOR']) {
               console.log('❌ このGitHubアカウントは既に作品を投稿済みです（1アカウント1作品まで）');
-              console.log('   既存エントリー: ' + reg['$AUTHOR_HASH']);
+              console.log('   既存エントリー: ' + reg['$PR_AUTHOR']);
               process.exit(1);
             }
           "; then
@@ -217,7 +215,6 @@ jobs:
       - name: Update registry
         run: |
           PR_AUTHOR="${{ github.event.pull_request.user.login }}"
-          AUTHOR_HASH=$(echo -n "$PR_AUTHOR" | sha256sum | awk '{print $1}')
 
           # 新しく追加されたディレクトリ名を取得
           git fetch origin ${{ github.event.pull_request.base.ref }} --depth=1
@@ -228,20 +225,20 @@ jobs:
             exit 0
           fi
 
-          echo "Registering: $AUTHOR_HASH -> $NEW_DIR"
+          echo "Registering: $PR_AUTHOR -> $NEW_DIR"
 
           # .registry.json を更新
           if [ -f .registry.json ]; then
             node -e "
               const fs = require('fs');
               const reg = JSON.parse(fs.readFileSync('.registry.json', 'utf-8'));
-              reg['$AUTHOR_HASH'] = '$NEW_DIR';
+              reg['$PR_AUTHOR'] = '$NEW_DIR';
               fs.writeFileSync('.registry.json', JSON.stringify(reg, null, 2) + '\n');
             "
           else
             node -e "
               const fs = require('fs');
-              const reg = { '$AUTHOR_HASH': '$NEW_DIR' };
+              const reg = { '$PR_AUTHOR': '$NEW_DIR' };
               fs.writeFileSync('.registry.json', JSON.stringify(reg, null, 2) + '\n');
             "
           fi

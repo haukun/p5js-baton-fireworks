@@ -67,21 +67,20 @@ jobs:
             // 作品IDの決定: 既に投稿済みなら既存のIDを使う（上書き）、なければ新規
             const fs = require('fs');
             const path = require('path');
-            const crypto = require('crypto');
             const registryPath = path.join(process.cwd(), '.registry.json');
             const registry = fs.existsSync(registryPath)
               ? JSON.parse(fs.readFileSync(registryPath, 'utf-8'))
               : {};
-            const authorHash = crypto.createHash('sha256').update(issue.user.login).digest('hex');
+            const username = issue.user.login;
 
-            const isUpdate = !!registry[authorHash];
-            const entryName = isUpdate ? registry[authorHash] : `entry-${issue.number}`;
+            const isUpdate = !!registry[username];
+            const entryName = isUpdate ? registry[username] : `entry-${issue.number}`;
 
             core.setOutput('title', title);
             core.setOutput('author', author);
             core.setOutput('entry_name', entryName);
             core.setOutput('errors', JSON.stringify(errors));
-            core.setOutput('author_hash', authorHash);
+            core.setOutput('username', username);
             core.setOutput('has_errors', errors.length > 0 ? 'true' : 'false');
             core.setOutput('is_update', isUpdate ? 'true' : 'false');
 
@@ -116,7 +115,7 @@ jobs:
             const fs = require('fs');
             const path = require('path');
 
-            const entryName = '${{ steps.parse.outputs.entry_name }}';
+            const entryName = ${{ toJSON(steps.parse.outputs.entry_name) }};
             const title = ${{ toJSON(steps.parse.outputs.title) }};
             const author = ${{ toJSON(steps.parse.outputs.author) }};
 
@@ -143,6 +142,40 @@ jobs:
             const content = `// ============================================================\nconst TITLE = ${JSON.stringify(title)};\nconst AUTHOR = ${JSON.stringify(author)};\n// ============================================================\n\n${code}\n`;
             fs.writeFileSync(path.join(dir, 'sketch.js'), content);
 
+      - name: Install Puppeteer
+        if: steps.parse.outputs.has_errors == 'false'
+        run: npm install puppeteer@24 --no-save
+
+      - name: Run sketch execution test
+        id: sketch-test
+        if: steps.parse.outputs.has_errors == 'false'
+        continue-on-error: true
+        run: |
+          ENTRY_NAME="${{ steps.parse.outputs.entry_name }}"
+          node scripts/validate-sketch.js "entries/${ENTRY_NAME}/sketch.js"
+
+      - name: Report sketch execution failure
+        if: steps.parse.outputs.has_errors == 'false' && steps.sketch-test.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: '## ❌ 実行テスト失敗\n\n作品が正常終了しませんでした。高負荷の処理があるか、無限ループの可能性があります。\n\n[Playground](https://haukun.github.io/p5js-baton-fireworks/playground/) でコードの動作を確認し、修正してから再度投稿してください。\n\n---\n*このIssueは自動クローズされます。*'
+            });
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              state: 'closed',
+              labels: ['submission', 'invalid']
+            });
+
+      - name: Abort if sketch test failed
+        if: steps.parse.outputs.has_errors == 'false' && steps.sketch-test.outcome == 'failure'
+        run: exit 1
       - name: Download icon if provided
         if: steps.parse.outputs.has_errors == 'false'
         uses: actions/github-script@v7
@@ -154,7 +187,7 @@ jobs:
 
             const issue = context.payload.issue;
             const body = issue.body || '';
-            const entryName = '${{ steps.parse.outputs.entry_name }}';
+            const entryName = ${{ toJSON(steps.parse.outputs.entry_name) }};
 
             function extractField(body, label) {
               const regex = new RegExp(`### ${label}[^\\n]*\\s*\\n\\n([\\s\\S]*?)(?=\\n###|$)`);
@@ -177,23 +210,74 @@ jobs:
             }
             console.log('Icon URL:', imgUrl);
 
-            // ダウンロード
-            const download = (url) => new Promise((resolve, reject) => {
-              https.get(url, (res) => {
+            // URLホスト制限: GitHub添付画像のみ許可
+            const allowedHosts = ['github.com', 'user-images.githubusercontent.com', 'avatars.githubusercontent.com', 'raw.githubusercontent.com'];
+            try {
+              const urlHost = new URL(imgUrl).hostname;
+              if (!allowedHosts.some(h => urlHost === h || urlHost.endsWith('.' + h))) {
+                console.log(`Icon URL host not allowed: ${urlHost}, skipping`);
+                return;
+              }
+            } catch (e) {
+              console.log('Invalid icon URL, skipping');
+              return;
+            }
+
+            // ダウンロード（リダイレクト最大5回、サイズ上限200KB、タイムアウト10秒、Content-Typeチェック）
+            const MAX_REDIRECTS = 5;
+            const MAX_SIZE = 200 * 1024;
+            const DOWNLOAD_TIMEOUT = 10000;
+            const ALLOWED_CONTENT_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+
+            const download = (url, redirectCount = 0) => new Promise((resolve, reject) => {
+              if (redirectCount > MAX_REDIRECTS) {
+                return reject(new Error('Too many redirects'));
+              }
+              const req = https.get(url, (res) => {
                 if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-                  return download(res.headers.location).then(resolve).catch(reject);
+                  res.resume();
+                  return download(res.headers.location, redirectCount + 1).then(resolve).catch(reject);
+                }
+                if (res.statusCode !== 200) {
+                  res.resume();
+                  return reject(new Error(`HTTP ${res.statusCode}`));
+                }
+                // Content-Type チェック
+                const contentType = (res.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+                if (!ALLOWED_CONTENT_TYPES.includes(contentType)) {
+                  res.destroy();
+                  return reject(new Error(`Invalid Content-Type: ${contentType}`));
                 }
                 const chunks = [];
-                res.on('data', (chunk) => chunks.push(chunk));
+                let totalSize = 0;
+                res.on('data', (chunk) => {
+                  totalSize += chunk.length;
+                  if (totalSize > MAX_SIZE) {
+                    res.destroy();
+                    return reject(new Error(`Download exceeds ${MAX_SIZE} bytes, aborted`));
+                  }
+                  chunks.push(chunk);
+                });
                 res.on('end', () => resolve(Buffer.concat(chunks)));
                 res.on('error', reject);
-              }).on('error', reject);
+              });
+              req.on('error', reject);
+              req.setTimeout(DOWNLOAD_TIMEOUT, () => {
+                req.destroy();
+                reject(new Error('Download timeout'));
+              });
             });
 
-            const data = await download(imgUrl);
+            let data;
+            try {
+              data = await download(imgUrl);
+            } catch (e) {
+              console.log(`Icon download failed: ${e.message}, skipping`);
+              return;
+            }
 
             // サイズチェック (200KB)
-            if (data.length > 200 * 1024) {
+            if (data.length > MAX_SIZE) {
               console.log(`Icon too large (${data.length} bytes), skipping`);
               return;
             }
@@ -210,16 +294,15 @@ jobs:
 
       - name: Update registry
         if: steps.parse.outputs.has_errors == 'false'
-        run: |
-          ENTRY_NAME="${{ steps.parse.outputs.entry_name }}"
-          AUTHOR_HASH="${{ steps.parse.outputs.author_hash }}"
-
-          node -e "
+        uses: actions/github-script@v7
+        with:
+          script: |
             const fs = require('fs');
+            const username = ${{ toJSON(steps.parse.outputs.username) }};
+            const entryName = ${{ toJSON(steps.parse.outputs.entry_name) }};
             const reg = JSON.parse(fs.readFileSync('.registry.json', 'utf-8'));
-            reg['${AUTHOR_HASH}'] = '${ENTRY_NAME}';
+            reg[username] = entryName;
             fs.writeFileSync('.registry.json', JSON.stringify(reg, null, 2) + '\n');
-          "
 
       - name: Build entries.json
         if: steps.parse.outputs.has_errors == 'false'
@@ -264,6 +347,8 @@ jobs:
         with:
           script: |
             const siteUrl = 'https://haukun.github.io/p5js-baton-fireworks/';
+            const entryName = ${{ toJSON(steps.parse.outputs.entry_name) }};
+            const shareUrl = `${siteUrl}viewer-fireworks/?start=${entryName}`;
 
             const isUpdate = '${{ steps.parse.outputs.is_update }}' === 'true';
             const msg = isUpdate ? '更新' : '登録';
@@ -272,7 +357,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: `## ✅ ${msg}完了！\n\nあなたの作品が${msg}されました！\n\n🎆 ギャラリーで見る: ${siteUrl}\n\nデプロイが完了するまで1〜2分お待ちください。\n\n---\n*このIssueは自動クローズされます。*`
+              body: `## ✅ ${msg}完了！\n\nあなたの作品が${msg}されました！\n\n🎆 ギャラリーで見る: ${siteUrl}\n\n🔗 あなたの作品が最初に再生されるURL（SNSでシェアしよう！）:\n${shareUrl}\n\nデプロイが完了するまで1〜2分お待ちください。\n\n---\n*このIssueは自動クローズされます。*`
             });
 
             await github.rest.issues.update({

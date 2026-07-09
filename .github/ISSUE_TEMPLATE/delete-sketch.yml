@@ -1,13 +1,18 @@
 name: "🗑️ 作品を削除する / Delete a Sketch"
-description: "投稿済みの作品を削除します"
+description: "投稿済みの作品を削除します / Delete your submitted sketch"
 title: "作品削除"
 labels: ["delete"]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        > ⚠️ タイトル欄（上の「Add a title」）は変更しないでください。/ Do not change the title field above.
+
   - type: checkboxes
     id: confirm
     attributes:
       label: "削除の確認 / Confirm Deletion"
-      description: "この操作は取り消せません"
+      description: "この操作は取り消せません / This action cannot be undone"
       options:
         - label: "自分の作品を削除することを確認します / I confirm I want to delete my submission"
           required: true

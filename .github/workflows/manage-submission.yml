@@ -27,25 +27,24 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const crypto = require('crypto');
             const path = require('path');
 
             const issue = context.payload.issue;
-            const authorHash = crypto.createHash('sha256').update(issue.user.login).digest('hex');
+            const username = issue.user.login;
 
             const registryPath = path.join(process.cwd(), '.registry.json');
             const registry = fs.existsSync(registryPath)
               ? JSON.parse(fs.readFileSync(registryPath, 'utf-8'))
               : {};
 
-            const entryName = registry[authorHash] || '';
+            const entryName = registry[username] || '';
 
             if (!entryName) {
               core.setOutput('has_entry', 'false');
             } else {
               core.setOutput('has_entry', 'true');
               core.setOutput('entry_name', entryName);
-              core.setOutput('author_hash', authorHash);
+              core.setOutput('username', username);
             }
 
       - name: Report no entry found
@@ -68,18 +67,24 @@ jobs:
 
       - name: Delete entry
         if: steps.identify.outputs.has_entry == 'true'
-        run: |
-          ENTRY_NAME="${{ steps.identify.outputs.entry_name }}"
-          AUTHOR_HASH="${{ steps.identify.outputs.author_hash }}"
-
-          rm -rf "entries/${ENTRY_NAME}"
-
-          node -e "
+        uses: actions/github-script@v7
+        with:
+          script: |
             const fs = require('fs');
+            const path = require('path');
+            const entryName = ${{ toJSON(steps.identify.outputs.entry_name) }};
+            const username = ${{ toJSON(steps.identify.outputs.username) }};
+
+            // エントリーフォルダ削除
+            const entryDir = path.join('entries', entryName);
+            if (fs.existsSync(entryDir)) {
+              fs.rmSync(entryDir, { recursive: true, force: true });
+            }
+
+            // レジストリから削除
             const reg = JSON.parse(fs.readFileSync('.registry.json', 'utf-8'));
-            delete reg['${AUTHOR_HASH}'];
+            delete reg[username];
             fs.writeFileSync('.registry.json', JSON.stringify(reg, null, 2) + '\n');
-          "
 
       - name: Build entries.json
         if: steps.identify.outputs.has_entry == 'true'

@@ -9,6 +9,7 @@
   const CANVAS_HEIGHT = 800;
   const TOTAL_FRAMES = 600;
   const CROSSFADE_DURATION = 1500;
+  const FORCE_TIMEOUT = 15000;
 
   // バリデーション: process-submission.yml と同じ禁止パターン
   const BANNED_PATTERNS = [
@@ -91,6 +92,7 @@ function draw() {
   let currentBlobUrl = null;
   let isRunning = false;
   let frameListener = null;
+  let forceTimer = null;
 
   const codeEditor = document.getElementById('code-editor');
   const btnRun = document.getElementById('btn-run');
@@ -189,6 +191,7 @@ function draw() {
 
   function stop() {
     isRunning = false;
+    clearTimeout(forceTimer);
     slotA.src = 'about:blank';
     slotB.src = 'about:blank';
     slotA.classList.add('active');
@@ -237,6 +240,14 @@ function draw() {
           slotA.src = 'about:blank';
           slotA.classList.remove('fading-out');
           URL.revokeObjectURL(beforeBlob);
+          // 親側強制タイマー: 15秒で sketch-complete が来なくても強制的に次へ
+          clearTimeout(forceTimer);
+          forceTimer = setTimeout(() => {
+            if (!isRunning || !frameListener || frameListener.phase !== 'user') return;
+            console.warn('Force timeout: sketch did not complete in time.');
+            frameListener.phase = 'after';
+            frameListener.onUserComplete();
+          }, FORCE_TIMEOUT);
         }, CROSSFADE_DURATION);
       }, 500);
     };
@@ -276,12 +287,15 @@ function draw() {
 
   function onMessage(event) {
     if (!isRunning || !frameListener) return;
+    // 送信元チェック: slotA または slotB からのメッセージのみ受け付ける
+    if (event.source !== slotA.contentWindow && event.source !== slotB.contentWindow) return;
 
     if (event.data.type === 'sketch-complete') {
       if (frameListener.phase === 'before') {
         frameListener.phase = 'user';
         frameListener.onBeforeComplete();
       } else if (frameListener.phase === 'user') {
+        clearTimeout(forceTimer);
         frameListener.phase = 'after';
         frameListener.onUserComplete();
       }
@@ -309,6 +323,7 @@ function draw() {
 <html>
 <head>
   <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'none'; connect-src 'none'; font-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none';">
   <style>
     body, html { margin: 0; padding: 0; overflow: hidden; background: #000; }
     canvas { display: block; }
