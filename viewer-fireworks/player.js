@@ -180,7 +180,9 @@
     let transformedCode = userCode
       .replace(/function\s+setup\s*\(/g, 'function __p5c_setup__(')
       .replace(/function\s+draw\s*\(/g, 'function __p5c_draw__(')
-      .replace(/createCanvas\s*\([^)]*\)\s*;?/g, '// createCanvas removed by system');
+      .replace(/\bdraw\s*=\s*/g, '__p5c_draw__ = ')
+      .replace(/\bsetup\s*=\s*/g, '__p5c_setup__ = ')
+      .replace(/\bcreateCanvas\s*\(/g, '__p5c_createCanvas__(');
 
     const safeCode = transformedCode.replace(/<\/script>/g, '<\\/script>');
     const startDelay = 500 + CROSSFADE_DURATION; // クロスフェード完了後にdraw開始
@@ -218,10 +220,12 @@
 
     var __drawEnabled = ${paused ? 'false' : 'true'};
     var __userFrameCount = 0;
+    function __p5c_createCanvas__() { return null; }
 
     ${paused ? `
     setTimeout(function() {
       __drawEnabled = true;
+      loop();
     }, ${startDelay});
     ` : ''}
 
@@ -231,6 +235,12 @@
     function setup() {
       createCanvas(${CANVAS_WIDTH}, ${CANVAS_HEIGHT}${useWebGL ? ', WEBGL' : ''});
       frameRate(60);
+      Object.defineProperty(window, 'frameCount', {
+        get: function() { return __userFrameCount; },
+        set: function() {},
+        configurable: true
+      });
+      ${paused ? 'noLoop();' : ''}
       if (typeof __p5c_setup__ === 'function') __p5c_setup__();
       window.parent.postMessage({ type: 'setup-complete' }, '*');
     }
@@ -239,7 +249,6 @@
       if (!__drawEnabled) return;
 
       __userFrameCount++;
-      frameCount = __userFrameCount;
       if (typeof __p5c_draw__ === 'function') __p5c_draw__();
 
       if (__userFrameCount >= ${TOTAL_FRAMES}) {

@@ -293,6 +293,7 @@ function draw() {
     if (event.data.type === 'sketch-complete') {
       if (frameListener.phase === 'before') {
         frameListener.phase = 'user';
+        frameCounter.textContent = '000';
         frameListener.onBeforeComplete();
       } else if (frameListener.phase === 'user') {
         clearTimeout(forceTimer);
@@ -314,7 +315,9 @@ function draw() {
     let transformedCode = userCode
       .replace(/function\s+setup\s*\(/g, 'function __p5c_setup__(')
       .replace(/function\s+draw\s*\(/g, 'function __p5c_draw__(')
-      .replace(/createCanvas\s*\([^)]*\)\s*;?/g, '// createCanvas removed by system');
+      .replace(/\bdraw\s*=\s*/g, '__p5c_draw__ = ')
+      .replace(/\bsetup\s*=\s*/g, '__p5c_setup__ = ')
+      .replace(/\bcreateCanvas\s*\(/g, '__p5c_createCanvas__(');
 
     const safeCode = transformedCode.replace(/<\/script>/g, '<\\/script>');
     const startDelay = 500 + CROSSFADE_DURATION;
@@ -353,10 +356,12 @@ function draw() {
 
     var __drawEnabled = ${paused ? 'false' : 'true'};
     var __userFrameCount = ${startFrame};
+    function __p5c_createCanvas__() { return null; }
 
     ${paused ? `
     setTimeout(function() {
       __drawEnabled = true;
+      loop();
     }, ${startDelay});
     ` : ''}
 
@@ -366,6 +371,12 @@ function draw() {
     function setup() {
       createCanvas(${CANVAS_WIDTH}, ${CANVAS_HEIGHT}${useWebGL ? ', WEBGL' : ''});
       frameRate(60);
+      Object.defineProperty(window, 'frameCount', {
+        get: function() { return __userFrameCount; },
+        set: function() {},
+        configurable: true
+      });
+      ${paused ? 'noLoop();' : ''}
       if (typeof __p5c_setup__ === 'function') __p5c_setup__();
       window.parent.postMessage({ type: 'setup-complete' }, '*');
     }
@@ -374,13 +385,10 @@ function draw() {
       if (!__drawEnabled) return;
 
       __userFrameCount++;
-      frameCount = __userFrameCount;
       if (typeof __p5c_draw__ === 'function') __p5c_draw__();
 
-      // frameCount を親に通知
-      if (__userFrameCount % 10 === 0) {
-        window.parent.postMessage({ type: 'frame-update', frame: __userFrameCount }, '*');
-      }
+      // frameCount を親に通知（毎フレーム）
+      window.parent.postMessage({ type: 'frame-update', frame: __userFrameCount }, '*');
 
       if (__userFrameCount >= ${TOTAL_FRAMES}) {
         noLoop();

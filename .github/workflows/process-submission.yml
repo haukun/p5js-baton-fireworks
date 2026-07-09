@@ -156,7 +156,7 @@ jobs:
         continue-on-error: true
         run: |
           ENTRY_NAME="${{ steps.parse.outputs.entry_name }}"
-          node scripts/validate-sketch.js "entries/${ENTRY_NAME}/sketch.js"
+          xvfb-run --auto-servernum node scripts/validate-sketch.js "entries/${ENTRY_NAME}/sketch.js"
 
       - name: Report sketch execution failure
         if: steps.parse.outputs.has_errors == 'false' && steps.sketch-test.outcome == 'failure'
