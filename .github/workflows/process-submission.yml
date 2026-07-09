@@ -358,7 +358,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: `## ✅ ${msg}完了！\n\nあなたの作品が${msg}されました！\n\n🎆 ギャラリーで見る: ${siteUrl}\n\n🔗 あなたの作品が最初に再生されるURL（SNSでシェアしよう！）:\n${shareUrl}\n\nデプロイが完了するまで1〜2分お待ちください。\n\n---\n*このIssueは自動クローズされます。*`
+              body: `## ✅ ${msg}完了！\n\nあなたの作品が${msg}されました！\n\n🎆 ギャラリーで見る: ${siteUrl}\n\n🔗 あなたの作品が最初に再生されるURL（SNSでシェアしよう！）:\n${shareUrl}\n\n---\n*このIssueは自動クローズされます。*`
             });
 
             await github.rest.issues.update({
