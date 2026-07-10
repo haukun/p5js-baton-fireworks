@@ -19,24 +19,13 @@
       </div>
     </div>
 
+    <!-- フレーム画像オーバーレイ -->
+    <img id="frame-overlay" src="../assets/frame.png" alt="">
+
     <!-- 作品カウンター -->
     <div id="counter"></div>
   </div>
 
-  <script>
-    // 400x800 のステージを画面に収まるようスケール
-    (function() {
-      var stage = document.getElementById('stage');
-      function fit() {
-        var scaleX = window.innerWidth / 400;
-        var scaleY = window.innerHeight / 800;
-        var scale = Math.min(scaleX, scaleY);
-        stage.style.transform = 'scale(' + scale + ')';
-      }
-      fit();
-      window.addEventListener('resize', fit);
-    })();
-  </script>
   <script>
     // 400x800 のステージを画面に収まるようスケール
     (function() {

@@ -14,8 +14,9 @@ t=0
 
 function draw() {
   t++;
-  fill(120-t/5,t/10,100)
-  for(r=PI/8;r<TAU;r+=PI/4){
-    circle(200+cos(r)*t/4,400+sin(r)*t/4,t/8)
+  background(160, 90, 0,.05);
+  fill(30-t/10,t/5,100)
+  for(r=0;r<TAU;r+=PI/8){
+    circle(200+cos(r)*t/2,300+sin(r)*t/2,t/9)
   }
 }

@@ -341,6 +341,7 @@ jobs:
           cp -r entries _site/entries
           cp -r playground _site/playground
           cp -r admin _site/admin
+          cp -r assets _site/assets
           mkdir -p _site/docs
           cp docs/guide.html _site/docs/guide.html
           cp docs/guide-en.html _site/docs/guide-en.html

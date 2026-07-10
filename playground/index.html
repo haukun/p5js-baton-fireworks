@@ -47,7 +47,7 @@ function draw() {
           <span class="phase-arrow">→</span>
           <span class="phase" data-phase="crossfade1">🔀</span>
           <span class="phase-arrow">→</span>
-          <span class="phase" data-phase="user">あなたの作品(<span id="frame-counter">000</span>/600)</span>
+          <span class="phase" data-phase="user">あなたの作品(<span id="frame-counter">000</span>/300)</span>
           <span class="phase-arrow">→</span>
           <span class="phase" data-phase="crossfade2">🔀</span>
           <span class="phase-arrow">→</span>
@@ -56,6 +56,8 @@ function draw() {
         <div class="preview-container">
           <iframe id="slot-a" class="preview-slot active" sandbox="allow-scripts"></iframe>
           <iframe id="slot-b" class="preview-slot" sandbox="allow-scripts"></iframe>
+          <!-- フレーム画像オーバーレイ -->
+          <img class="frame-overlay" src="../assets/frame.png" alt="">
           <div id="overlay" class="overlay">
             <img id="overlay-icon" class="overlay-icon" alt="">
             <div class="overlay-text">

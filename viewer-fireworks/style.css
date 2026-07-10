@@ -92,14 +92,25 @@ html, body {
   font-size: 18px;
   font-weight: 700;
   color: #fff;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 1), 0 0 20px rgba(0, 0, 0, 0.8);
   margin-bottom: 4px;
 }
 
 #overlay-author {
   font-size: 14px;
   color: rgba(255, 255, 255, 0.8);
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 1), 0 0 16px rgba(0, 0, 0, 0.8);
+}
+
+/* フレーム画像オーバーレイ */
+#frame-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 20;
+  pointer-events: none;
 }
 
 /* カウンター */

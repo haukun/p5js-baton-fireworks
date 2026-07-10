@@ -196,12 +196,17 @@
     <table>
       <tr><th>項目</th><th>内容</th></tr>
       <tr><td>p5.jsバージョン</td><td>2.3.0</td></tr>
-      <tr><td>キャンバスサイズ</td><td>400 x 800 px</td></tr>
-      <tr><td>フレームレート</td><td>60fps（システムが自動設定）</td></tr>
-      <tr><td>再生時間</td><td>10秒間（600フレームで自動停止）</td></tr>
+      <tr><td>キャンバスサイズ</td><td>400 x 800 px<br><small style="color:#aaa;">※下図のフレームがキャンバスの上に描かれます。</small></td></tr>
+      <tr><td>フレームレート</td><td>30fps（システムが自動設定）</td></tr>
+      <tr><td>再生時間</td><td>300フレーム（約10秒）もしくは15秒の実行で自動停止します。</td></tr>
       <tr><td>テーマ</td><td>花火（解釈は自由！）</td></tr>
       <tr><td>その他</td><td>各作品はsandbox環境で実行されます。<br />外部への通信や外部ファイルの読み込みはできません。</td></tr>
     </table>
+
+    <div class="note" style="text-align: center;">
+      <p style="margin-bottom: 8px;">再生時、以下のフレーム画像がキャンバスの上に重ねて表示されます。</p>
+      <img src="../assets/frame.png" alt="フレーム画像" style="width: 50%; max-width: 200px; border: 1px solid #333; border-radius: 4px;">
+    </div>
 
     <h3>🎨 動作の仕組み（ざっくり）</h3>
     <p>あなたの作品は以下のように再生されます：</p>
@@ -209,8 +214,8 @@
       <li>前の人の作品が終了する</li>
       <li>あなたの <code>setup()</code> が1回呼ばれる（初期化）</li>
       <li>クロスフェードであなたの作品が表示される（この間 <code>draw()</code> はまだ動かない）</li>
-      <li>クロスフェードが完了したら <code>draw()</code> が600回呼ばれる（10秒間）</li>
-      <li>10秒経ったら自動で停止し、次の人の作品へ</li>
+      <li>クロスフェードが完了したら <code>draw()</code> が300回呼ばれる（約10秒間）</li>
+      <li><code>draw()</code> が300回呼ばれたか、15秒経ったら自動で停止し、次の人の作品へ</li>
     </ol>
 
     <h3>🖼️ createCanvas について</h3>
@@ -295,7 +300,9 @@
     <!-- Tips -->
     <h2>🌟Tips</h2>
     <ul>
-      <li>作品の <code>frameCount</code> は1〜600まで動作しますので、作品中の時間管理に使うことができます。</li>
+      <li>作品の <code>frameCount</code> は1〜300まで動作しますので、作品中の時間管理に使うことができます</li>
+      <li>この企画では安定性のため30fpsで再生します。動きのある作品は、普段のp5.js作品より少し速めに動かすと見やすくなる場合があります</li>
+      <li>30fpsの動きを確認する場合は、Playgroundを使うか、自分のp5.js環境で<code>setup()</code> に <code>frameRate(30)</code> を書いてください</li>
       <li><code>background(0, 0, 0, 20);</code> で残像効果が作れます（花火の尾が残る）</li>
       <li><code>colorMode(HSB)</code> を使うと色相で鮮やかな色が作りやすいです</li>
       <li>複数の花火を時間差で打ち上げると豪華になります</li>
@@ -318,7 +325,7 @@
     </div>
 
     <div class="faq-item">
-      <p class="faq-q">Q: 600フレーム経ったらどうなる？</p>
+      <p class="faq-q">Q: 300フレーム経ったらどうなる？</p>
       <p class="faq-a">A: 自動的にアニメーションが停止し、次の作品にクロスフェードします。</p>
     </div>
 

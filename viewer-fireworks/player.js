@@ -7,7 +7,7 @@
 
   const CANVAS_WIDTH = 400;
   const CANVAS_HEIGHT = 800;
-  const TOTAL_FRAMES = 600;
+  const TOTAL_FRAMES = 300;
   const CROSSFADE_DURATION = 1500; // クロスフェード時間(ms)
   const FORCE_TIMEOUT = 15000; // 親側強制タイマー(ms)
 
@@ -41,7 +41,7 @@
     }
 
     try {
-      const response = await fetch('entries.json');
+      const response = await fetch('entries.json?t=' + Date.now());
       entries = await response.json();
     } catch (e) {
       console.error('entries.json の読み込みに失敗:', e);
@@ -93,7 +93,7 @@
     activeSlot.classList.remove('fading-out');
     activeSlot.classList.add('active');
 
-    showOverlay(entry.title, entry.author, entry.icon ? `../entries/${entry.id}/${entry.icon}` : null);
+    showOverlay(entry.title, entry.author, entry.icon ? `../entries/${entry.id}/${entry.icon}?t=${Date.now()}` : null);
     updateCounter();
 
     // 親側強制タイマー: sketch-complete が来なくても強制的に次へ
@@ -125,7 +125,7 @@
       nextSlot.classList.remove('fading-out');
       nextSlot.classList.add('active');
 
-      showOverlay(nextEntry.title, nextEntry.author, nextEntry.icon ? `../entries/${nextEntry.id}/${nextEntry.icon}` : null);
+      showOverlay(nextEntry.title, nextEntry.author, nextEntry.icon ? `../entries/${nextEntry.id}/${nextEntry.icon}?t=${Date.now()}` : null);
 
       // クロスフェード完了後にスロット入れ替え
       setTimeout(() => {
@@ -234,7 +234,7 @@
 
     function setup() {
       createCanvas(${CANVAS_WIDTH}, ${CANVAS_HEIGHT}${useWebGL ? ', WEBGL' : ''});
-      frameRate(60);
+      frameRate(30);
       Object.defineProperty(window, 'frameCount', {
         get: function() { return __userFrameCount; },
         set: function() {},

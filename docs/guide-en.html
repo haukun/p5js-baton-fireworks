@@ -190,12 +190,17 @@
     <table>
       <tr><th>Item</th><th>Details</th></tr>
       <tr><td>p5.js version</td><td>2.3.0</td></tr>
-      <tr><td>Canvas size</td><td>400 x 800 px</td></tr>
-      <tr><td>Frame rate</td><td>60fps (set automatically by the system)</td></tr>
-      <tr><td>Duration</td><td>10 seconds (auto-stops at 600 frames)</td></tr>
+      <tr><td>Canvas size</td><td>400 x 800 px<br><small style="color:#aaa;">*A shared frame image (shown below) is drawn on top of the canvas.</small></td></tr>
+      <tr><td>Frame rate</td><td>30fps (set automatically by the system)</td></tr>
+      <tr><td>Duration</td><td>Auto-stops after 300 frames (approx. 10 seconds) or 15 seconds of execution, whichever comes first.</td></tr>
       <tr><td>Theme</td><td>Fireworks (interpret freely!)</td></tr>
       <tr><td>Other</td><td>Each sketch runs in a sandbox environment.<br />External communication and file loading are not available.</td></tr>
     </table>
+
+    <div class="note" style="text-align: center;">
+      <p style="margin-bottom: 8px;">During playback, the following shared frame image is overlaid on top of the canvas.</p>
+      <img src="../assets/frame.png" alt="Frame image" style="width: 50%; max-width: 200px; border: 1px solid #333; border-radius: 4px;">
+    </div>
 
     <h3>🎨 How it works (overview)</h3>
     <p>Your sketch is played as follows:</p>
@@ -203,8 +208,8 @@
       <li>The previous person's sketch finishes</li>
       <li>Your <code>setup()</code> is called once (initialization)</li>
       <li>Your sketch fades in via crossfade (<code>draw()</code> is not running yet)</li>
-      <li>After the crossfade completes, <code>draw()</code> is called 600 times (10 seconds)</li>
-      <li>After 10 seconds, it auto-stops and transitions to the next sketch</li>
+      <li>After the crossfade completes, <code>draw()</code> is called 300 times (approx. 10 seconds)</li>
+      <li>After <code>draw()</code> has been called 300 times, or 15 seconds have passed, it auto-stops and transitions to the next sketch</li>
     </ol>
 
     <h3>🖼️ About createCanvas</h3>
@@ -285,7 +290,9 @@
     <!-- Tips -->
     <h2>🌟 Tips</h2>
     <ul>
-      <li><code>frameCount</code> runs from 1 to 600 — use it for time-based animations</li>
+      <li><code>frameCount</code> runs from 1 to 300 — use it for time-based animations</li>
+      <li>This project runs at 30fps for stability. For animated sketches, you may want to move things slightly faster than you would at the usual 60fps.</li>
+      <li>To check how your sketch looks at 30fps, use the Playground or add <code>frameRate(30)</code> to your <code>setup()</code>.</li>
       <li><code>background(0, 0, 0, 20);</code> creates a trail effect (firework tails linger)</li>
       <li><code>colorMode(HSB)</code> makes it easy to create vibrant colors using hue</li>
       <li>Launching multiple fireworks with time offsets makes it look spectacular</li>
@@ -308,7 +315,7 @@
     </div>
 
     <div class="faq-item">
-      <p class="faq-q">Q: What happens after 600 frames?</p>
+      <p class="faq-q">Q: What happens after 300 frames?</p>
       <p class="faq-a">A: The animation stops automatically and crossfades to the next sketch.</p>
     </div>
 
