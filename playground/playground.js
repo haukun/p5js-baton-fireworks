@@ -7,7 +7,7 @@
 
   const CANVAS_WIDTH = 400;
   const CANVAS_HEIGHT = 800;
-  const TOTAL_FRAMES = 600;
+  const TOTAL_FRAMES = 300;
   const CROSSFADE_DURATION = 1500;
   const FORCE_TIMEOUT = 15000;
 
@@ -49,19 +49,19 @@ function setup() {
   colorMode(HSB);
   background(200, 90, 10);
   noStroke();
-  for(i=0;i<540;i++){
-    fill(60-i/10,i/10,100)
+  for(i=0;i<240;i++){
+    fill(60-i/5,i/5,100)
     for(r=0;r<TAU;r+=PI/4){
-      circle(200+cos(r)*i/4,400+sin(r)*i/4,i/8)
+      circle(200+cos(r)*i/2,400+sin(r)*i/2,i/4)
     }
   }
 }
 t=0
 function draw() {
   t++;
-  fill(60-(540+t)/10,(540+t)/10,100)
+  fill(60-(240+t)/5,(240+t)/5,100)
   for(r=0;r<TAU;r+=PI/4){
-    circle(200+cos(r)*(540+t)/4,400+sin(r)*(540+t)/4,(540+t)/8)
+    circle(200+cos(r)*(240+t)/2,400+sin(r)*(240+t)/2,(240+t)/4)
   }
 }`;
 
@@ -78,7 +78,7 @@ function draw() {
   t++;
   fill(120-t/5,t/10,100)
   for(r=PI/8;r<TAU;r+=PI/4){
-    circle(200+cos(r)*t/4,400+sin(r)*t/4,t/8)
+    circle(200+cos(r)*t/2,400+sin(r)*t/2,t/4)
   }
 }`;
 
@@ -194,7 +194,7 @@ function draw() {
     frameCounter.textContent = '000';
     isRunning = true;
 
-    // フェーズ1: 前の人の作品（frameCount=540から開始 → 600で完了）
+    // フェーズ1: 前の人の作品（frameCount=270から開始 → 300で完了）
     startSequence(code);
   }
 
@@ -217,9 +217,9 @@ function draw() {
   }
 
   function startSequence(userCode) {
-    // Step 1: 前の人の作品を slotA で再生 (frameCount 540スタート = 残り1秒)
+    // Step 1: 前の人の作品を slotA で再生 (frameCount 270スタート = 残り1秒)
     setPhase('before');
-    const beforeBlob = createSketchBlobURL(SAMPLE_BEFORE, false, 540);
+    const beforeBlob = createSketchBlobURL(SAMPLE_BEFORE, false, 270);
     slotA.src = beforeBlob;
     slotA.classList.add('active');
     slotA.classList.remove('fading-out');
@@ -379,7 +379,7 @@ function draw() {
 
     function setup() {
       createCanvas(${CANVAS_WIDTH}, ${CANVAS_HEIGHT}${useWebGL ? ', WEBGL' : ''});
-      frameRate(60);
+      frameRate(30);
       Object.defineProperty(window, 'frameCount', {
         get: function() { return __userFrameCount; },
         set: function() {},

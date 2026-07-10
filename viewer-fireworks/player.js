@@ -7,7 +7,7 @@
 
   const CANVAS_WIDTH = 400;
   const CANVAS_HEIGHT = 800;
-  const TOTAL_FRAMES = 600;
+  const TOTAL_FRAMES = 300;
   const CROSSFADE_DURATION = 1500; // クロスフェード時間(ms)
   const FORCE_TIMEOUT = 15000; // 親側強制タイマー(ms)
 
@@ -234,7 +234,7 @@
 
     function setup() {
       createCanvas(${CANVAS_WIDTH}, ${CANVAS_HEIGHT}${useWebGL ? ', WEBGL' : ''});
-      frameRate(60);
+      frameRate(30);
       Object.defineProperty(window, 'frameCount', {
         get: function() { return __userFrameCount; },
         set: function() {},

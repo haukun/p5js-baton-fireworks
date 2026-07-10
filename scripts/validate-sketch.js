@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // ============================================================
 // validate-sketch.js
-// Puppeteer で投稿スケッチを実行し、600フレーム完走するか検証する。
+// Puppeteer で投稿スケッチを実行し、300フレーム完走するか検証する。
 // 使い方: node scripts/validate-sketch.js <sketch.js のパス>
 // 終了コード: 0=成功, 1=タイムアウトまたはエラー
 // ============================================================
@@ -12,7 +12,7 @@ const path = require('path');
 
 const CANVAS_WIDTH = 400;
 const CANVAS_HEIGHT = 800;
-const TOTAL_FRAMES = 600;
+const TOTAL_FRAMES = 300;
 const TIMEOUT_MS = 30000; // 30秒タイムアウト
 
 async function main() {
@@ -82,7 +82,7 @@ async function main() {
 
     function setup() {
       createCanvas(${CANVAS_WIDTH}, ${CANVAS_HEIGHT}${useWebGL ? ', WEBGL' : ''});
-      frameRate(60);
+      frameRate(30);
       Object.defineProperty(window, 'frameCount', {
         get: function() { return __userFrameCount; },
         set: function() {},
@@ -130,7 +130,7 @@ async function main() {
       TOTAL_FRAMES
     );
 
-    console.log('✅ スケッチは正常に600フレーム完走しました。');
+    console.log('✅ スケッチは正常に300フレーム完走しました。');
     process.exit(0);
   } catch (e) {
     if (e.message.includes('timeout') || e.message.includes('Timeout')) {
