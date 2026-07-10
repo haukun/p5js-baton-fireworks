@@ -14,6 +14,8 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    outputs:
+      is_trusted: ${{ steps.pr-type.outputs.is_trusted }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -26,7 +28,22 @@ jobs:
       - name: Fetch base branch for comparison
         run: git fetch origin ${{ github.event.pull_request.base.ref }} --depth=1
 
+      - name: Classify PR author
+        id: pr-type
+        run: |
+          case "${{ github.event.pull_request.author_association }}" in
+            OWNER|MEMBER|COLLABORATOR)
+              echo "is_trusted=true" >> "$GITHUB_OUTPUT"
+              echo "Trusted maintainer PR: skipping submission-only restrictions."
+              ;;
+            *)
+              echo "is_trusted=false" >> "$GITHUB_OUTPUT"
+              echo "External submission PR: enforcing submission-only restrictions."
+              ;;
+          esac
+
       - name: Check for unauthorized modifications
+        if: steps.pr-type.outputs.is_trusted != 'true'
         run: |
           # PR で変更・削除された全ファイルを取得
           ALL_CHANGES=$(git diff --name-status origin/${{ github.event.pull_request.base.ref }} HEAD -- entries/ || true)
@@ -71,6 +88,7 @@ jobs:
           echo "✅ Security check passed: new files only"
 
       - name: Check one-entry-per-user limit
+        if: steps.pr-type.outputs.is_trusted != 'true'
         run: |
           PR_AUTHOR="${{ github.event.pull_request.user.login }}"
 
@@ -95,6 +113,7 @@ jobs:
 
       - name: Find new/modified sketch files
         id: find-sketches
+        if: steps.pr-type.outputs.is_trusted != 'true'
         run: |
           # PR で追加された entries/ 内のファイルを取得（新規追加のみ）
           FILES=$(git diff --name-only --diff-filter=A origin/${{ github.event.pull_request.base.ref }} HEAD | grep '^entries/.*sketch\.js$' || true)
@@ -201,7 +220,7 @@ jobs:
   auto-merge:
     needs: validate
     runs-on: ubuntu-latest
-    if: success()
+    if: success() && needs.validate.outputs.is_trusted != 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -259,3 +278,4 @@ jobs:
         run: gh pr merge ${{ github.event.pull_request.number }} --squash --auto
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
