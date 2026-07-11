@@ -3,6 +3,11 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "start": "npx http-server . -p 8080 -c-1 -o /viewer-fireworks/"
+    "start": "npx http-server . -p 8080 -c-1 -o /viewer-fireworks/",
+    "test": "vitest run",
+    "test:e2e": "vitest run --config vitest.config.e2e.js"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.10"
   }
 }

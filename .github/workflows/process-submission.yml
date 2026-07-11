@@ -33,43 +33,8 @@ jobs:
             const issue = context.payload.issue;
             const body = issue.body || '';
 
-            function extractField(body, label) {
-              const regex = new RegExp(`### ${label}[^\\n]*\\s*\\n\\n([\\s\\S]*?)(?=\\n###|$)`);
-              const match = body.match(regex);
-              return match ? match[1].trim() : '';
-            }
-
-            const title = extractField(body, '作品タイトル / Title');
-            const author = extractField(body, '作者名 / Author');
-            let code = extractField(body, 'コード / Code');
-
-            code = code.replace(/^```javascript\n?/i, '').replace(/^```js\n?/i, '').replace(/\n?```$/g, '').trim();
-
-            const errors = [];
-            if (!title) errors.push('作品タイトルが空です');
-            if (!author) errors.push('作者名が空です');
-            if (!code) errors.push('コードが空です');
-
-            if (code && code.length > 51200) {
-              errors.push('コードが50KBを超えています');
-            }
-
-            const bannedPatterns = [
-              /\bfetch\s*\(/, /XMLHttpRequest/, /\bimport\s/, /\brequire\s*\(/,
-              /\beval\s*\(/, /\bFunction\s*\(/, /window\.open/,
-              /WebSocket/, /EventSource/, /RTCPeerConnection/, /sendBeacon/,
-              /AudioContext/, /webkitAudioContext/,
-              /\bloadImage\s*\(/, /\bloadSound\s*\(/, /\bloadFont\s*\(/,
-              /\bloadJSON\s*\(/, /\bloadStrings\s*\(/, /\bloadTable\s*\(/,
-              /\bloadBytes\s*\(/, /\bloadModel\s*\(/, /\bloadShader\s*\(/,
-              /__userFrameCount/, /__drawEnabled/, /__waiting/,
-              /__frameOffset/, /__p5c_setup__/, /__p5c_draw__/,
-            ];
-            for (const pattern of bannedPatterns) {
-              if (pattern.test(code)) {
-                errors.push(`禁止パターンが検出されました: ${pattern}`);
-              }
-            }
+            const { parseAndValidate } = require('./scripts/validate-submission.js');
+            const { title, author, code, errors } = parseAndValidate(body);
 
             // 作品IDの決定: 既に投稿済みなら既存のIDを使う（上書き）、なければ新規
             const fs = require('fs');

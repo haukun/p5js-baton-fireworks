@@ -170,6 +170,14 @@
       color: #666;
     }
   </style>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-BXVQXL0LFX"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-BXVQXL0LFX');
+  </script>
 </head>
 <body>
   <div class="container">
@@ -188,6 +196,12 @@
     <p class="lead">P5.jsで「花火」をテーマにした10秒間のアニメーション作品をみんなで持ち寄り、ランダムに連続再生されるオンラインギャラリーです。</p>
     <p>作品を投稿すると、他の参加者の花火と一緒にクロスフェードで次々に再生されます。</p>
     <p><a href="https://haukun.github.io/p5js-baton-fireworks/" class="btn-link">現在のギャラリーを見る</a></p>
+
+    <hr>
+
+    <!-- 開催期間 -->
+    <h2>📆 開催期間</h2>
+    <p class="lead">2026/08/31(JST)まで</p>
 
     <hr>
 
@@ -220,6 +234,10 @@
 
     <h3>🖼️ createCanvas について</h3>
     <p>投稿された作品は <code>createCanvas(400, 800)</code> または <code>createCanvas(400, 800, WEBGL)</code> で実行されます。それ以外の <code>createCanvas()</code> が含まれていてもシステムが自動で置き換えます。</p>
+
+    <h3>🎞️ frameRate について</h3>
+    <p>投稿された作品には自動で <code>frameRate(30)</code> が付与されます。それ以外の <code>frameRate()</code> が含まれていてもシステムが自動で除去します。</p>
+
 
     <h3 id="prohibited">⛔ 禁止事項</h3>
     <ul>
@@ -320,7 +338,7 @@
     </div>
 
     <div class="faq-item">
-      <p class="faq-q">Q: createCanvas() を書いてしまったけど大丈夫？</p>
+      <p class="faq-q">Q: createCanvas() や frameRate() を書いてしまったけど大丈夫？</p>
       <p class="faq-a">A: 大丈夫です。システムが自動で除去します。</p>
     </div>
 

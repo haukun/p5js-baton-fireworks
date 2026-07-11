@@ -10,6 +10,11 @@
   const TOTAL_FRAMES = 300;
   const CROSSFADE_DURATION = 1500; // クロスフェード時間(ms)
   const FORCE_TIMEOUT = 15000; // 親側強制タイマー(ms)
+  const CACHE_BUSTER = Date.now(); // ページロード時に1回だけ生成
+  const FETCH_TIMEOUT = 10000; // fetch タイムアウト(ms)
+  const RETRY_DELAY = 5000; // 全件失敗時の再試行待機(ms)
+  const WATCHDOG_INTERVAL = 60000; // watchdog チェック間隔(ms)
+  const WATCHDOG_STALL_LIMIT = 120000; // 進行停止判定閾値(ms)
 
   let entries = [];
   let currentIndex = -1;
@@ -17,6 +22,7 @@
   let forceTimer = null;
   let sketchStartTime = 0; // 作品再生開始時刻
   let isFirstPlay = true; // 初回再生フラグ
+  let lastProgressTime = Date.now(); // 最終進行時刻（watchdog用）
 
   const slotA = document.getElementById('slot-a');
   const slotB = document.getElementById('slot-b');
@@ -34,6 +40,10 @@
   async function init() {
     try {
       const p5Response = await fetch('p5.min.js');
+      if (!p5Response.ok) {
+        console.error('p5.min.js の読み込みに失敗 (' + p5Response.status + ')');
+        return;
+      }
       p5Source = await p5Response.text();
     } catch (e) {
       console.error('p5.min.js の読み込みに失敗:', e);
@@ -41,7 +51,11 @@
     }
 
     try {
-      const response = await fetch('entries.json?t=' + Date.now());
+      const response = await fetch('entries.json?v=' + CACHE_BUSTER);
+      if (!response.ok) {
+        console.error('entries.json の読み込みに失敗 (' + response.status + ')');
+        return;
+      }
       entries = await response.json();
     } catch (e) {
       console.error('entries.json の読み込みに失敗:', e);
@@ -75,106 +89,157 @@
       }
     });
 
+    // 最終 watchdog: 一定時間進行しなければページをリロード
+    setInterval(() => {
+      if (Date.now() - lastProgressTime > WATCHDOG_STALL_LIMIT) {
+        console.error('Watchdog: 再生が停止しています。ページをリロードします。');
+        location.reload();
+      }
+    }, WATCHDOG_INTERVAL);
+
     playNext();
   }
 
-  function playNext() {
-    currentIndex = (currentIndex + 1) % entries.length;
+  async function playNext() {
+    // 失敗時に次候補を試す（全件失敗で停止）
+    const totalEntries = entries.length;
+    for (let attempt = 0; attempt < totalEntries; attempt++) {
+      currentIndex = (currentIndex + 1) % entries.length;
 
-    if (currentIndex === 0 && entries.length > 1 && !isFirstPlay) {
-      shuffleArray(entries);
+      if (currentIndex === 0 && entries.length > 1 && !isFirstPlay) {
+        shuffleArray(entries);
+      }
+      isFirstPlay = false;
+
+      const entry = entries[currentIndex];
+      const success = await loadSketchInSlot(activeSlot, entry, false);
+      if (!success) continue;
+
+      // アクティブにする
+      activeSlot.classList.remove('fading-out');
+      activeSlot.classList.add('active');
+
+      showOverlay(entry.title, entry.author, entry.icon ? `../entries/${entry.id}/${entry.icon}?v=${CACHE_BUSTER}` : null);
+      updateCounter();
+
+      // 親側強制タイマー: sketch-complete が来なくても強制的に次へ
+      clearTimeout(forceTimer);
+      forceTimer = setTimeout(() => {
+        console.warn('Force timeout: sketch did not complete in time, skipping.');
+        onSketchComplete();
+      }, FORCE_TIMEOUT);
+      sketchStartTime = Date.now();
+      lastProgressTime = Date.now();
+      return;
     }
-    isFirstPlay = false;
-
-    const entry = entries[currentIndex];
-    loadSketchInSlot(activeSlot, entry, false);
-
-    // アクティブにする
-    activeSlot.classList.remove('fading-out');
-    activeSlot.classList.add('active');
-
-    showOverlay(entry.title, entry.author, entry.icon ? `../entries/${entry.id}/${entry.icon}?t=${Date.now()}` : null);
-    updateCounter();
-
-    // 親側強制タイマー: sketch-complete が来なくても強制的に次へ
-    clearTimeout(forceTimer);
-    forceTimer = setTimeout(() => {
-      console.warn('Force timeout: sketch did not complete in time, skipping.');
-      onSketchComplete();
-    }, FORCE_TIMEOUT);
-    sketchStartTime = Date.now();
+    console.warn('全作品の読み込みに失敗しました。' + RETRY_DELAY + 'ms後に再試行します。');
+    setTimeout(() => playNext(), RETRY_DELAY);
   }
 
-  function onSketchComplete() {
+  async function onSketchComplete() {
     if (isTransitioning) return;
     isTransitioning = true;
     clearTimeout(forceTimer);
 
-    const nextIndex = (currentIndex + 1) % entries.length;
-    const nextEntry = entries[nextIndex];
-
-    // 次のスケッチをnextSlotに読み込み（待機モード）
-    loadSketchInSlot(nextSlot, nextEntry, true);
+    // 次の作品を探す（失敗したらスキップして次候補を試す）
+    let nextIndex = currentIndex;
+    let nextEntry = null;
+    const totalEntries = entries.length;
+    for (let attempt = 0; attempt < totalEntries; attempt++) {
+      nextIndex = (nextIndex + 1) % entries.length;
+      nextEntry = entries[nextIndex];
+      const success = await loadSketchInSlot(nextSlot, nextEntry, true);
+      if (success) break;
+      if (attempt === totalEntries - 1) {
+        // 全件失敗 → 再試行
+        console.warn('全作品の読み込みに失敗。' + RETRY_DELAY + 'ms後に再試行します。');
+        isTransitioning = false;
+        setTimeout(() => playNext(), RETRY_DELAY);
+        return;
+      }
+    }
 
     // 少し待ってからクロスフェード開始（setup完了を待つ）
     setTimeout(() => {
-      // クロスフェード: 現在をフェードアウト、次をフェードイン
-      activeSlot.classList.remove('active');
-      activeSlot.classList.add('fading-out');
+      try {
+        // クロスフェード: 現在をフェードアウト、次をフェードイン
+        activeSlot.classList.remove('active');
+        activeSlot.classList.add('fading-out');
 
-      nextSlot.classList.remove('fading-out');
-      nextSlot.classList.add('active');
+        nextSlot.classList.remove('fading-out');
+        nextSlot.classList.add('active');
 
-      showOverlay(nextEntry.title, nextEntry.author, nextEntry.icon ? `../entries/${nextEntry.id}/${nextEntry.icon}?t=${Date.now()}` : null);
+        showOverlay(nextEntry.title, nextEntry.author, nextEntry.icon ? `../entries/${nextEntry.id}/${nextEntry.icon}?v=${CACHE_BUSTER}` : null);
+        counter.textContent = `${nextIndex + 1} / ${entries.length}`;
+      } catch (e) {
+        console.error('クロスフェード中にエラー:', e);
+      }
 
       // クロスフェード完了後にスロット入れ替え
       setTimeout(() => {
-        // 古いスロットをクリア
-        activeSlot.src = 'about:blank';
-        activeSlot.classList.remove('fading-out');
+        try {
+          // 古いスロットをクリア
+          activeSlot.srcdoc = '';
+          activeSlot.removeAttribute('src');
+          activeSlot.classList.remove('fading-out');
 
-        // スロット入れ替え
-        const temp = activeSlot;
-        activeSlot = nextSlot;
-        nextSlot = temp;
+          // スロット入れ替え
+          const temp = activeSlot;
+          activeSlot = nextSlot;
+          nextSlot = temp;
 
-        currentIndex = nextIndex;
-        isTransitioning = false;
-        updateCounter();
+          currentIndex = nextIndex;
+          isTransitioning = false;
+          lastProgressTime = Date.now();
+          updateCounter();
 
-        // 次の作品の強制タイマーを再arm
-        clearTimeout(forceTimer);
-        forceTimer = setTimeout(() => {
-          console.warn('Force timeout: sketch did not complete in time, skipping.');
-          onSketchComplete();
-        }, FORCE_TIMEOUT);
-        sketchStartTime = Date.now();
+          // 次の作品の強制タイマーを再arm
+          clearTimeout(forceTimer);
+          forceTimer = setTimeout(() => {
+            console.warn('Force timeout: sketch did not complete in time, skipping.');
+            onSketchComplete();
+          }, FORCE_TIMEOUT);
+          sketchStartTime = Date.now();
+        } catch (e) {
+          console.error('スロット入替中にエラー:', e);
+          isTransitioning = false;
+          setTimeout(() => playNext(), RETRY_DELAY);
+        }
       }, CROSSFADE_DURATION);
     }, 500);
   }
 
   async function loadSketchInSlot(slot, entry, paused) {
-    const codeUrl = `../entries/${entry.id}/sketch.js?t=${Date.now()}`;
+    if (!entry || !entry.id) {
+      console.error('不正なエントリー:', entry);
+      return false;
+    }
+    const codeUrl = `../entries/${entry.id}/sketch.js?v=${CACHE_BUSTER}`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
     let code;
     try {
-      const response = await fetch(codeUrl);
+      const response = await fetch(codeUrl, { signal: controller.signal });
+      if (!response.ok) {
+        clearTimeout(timeout);
+        console.error(`スケッチ読み込み失敗 (${response.status}): ${entry.id}`);
+        return false;
+      }
       code = await response.text();
+      clearTimeout(timeout);
     } catch (e) {
+      clearTimeout(timeout);
       console.error(`スケッチ読み込み失敗: ${entry.id}`, e);
-      setTimeout(() => { isTransitioning = false; playNext(); }, 100);
-      return;
+      return false;
     }
 
-    const blobUrl = createSketchBlobURL(code, paused);
-
-    if (slot.dataset.blobUrl) {
-      URL.revokeObjectURL(slot.dataset.blobUrl);
-    }
-    slot.dataset.blobUrl = blobUrl;
-    slot.src = blobUrl;
+    const html = createSketchHTML(code, paused);
+    slot.removeAttribute('src');
+    slot.srcdoc = html;
+    return true;
   }
 
-  function createSketchBlobURL(userCode, paused) {
+  function createSketchHTML(userCode, paused) {
     const canvasMatch = userCode.match(/createCanvas\s*\(([^)]*)\)/);
     const useWebGL = canvasMatch ? /\bWEBGL\b/.test(canvasMatch[1]) : false;
     let transformedCode = userCode
@@ -182,7 +247,8 @@
       .replace(/function\s+draw\s*\(/g, 'function __p5c_draw__(')
       .replace(/\bdraw\s*=\s*/g, '__p5c_draw__ = ')
       .replace(/\bsetup\s*=\s*/g, '__p5c_setup__ = ')
-      .replace(/\bcreateCanvas\s*\(/g, '__p5c_createCanvas__(');
+      .replace(/\bcreateCanvas\s*\(/g, '__p5c_createCanvas__(')
+      .replace(/\bframeRate\s*\(/g, '__p5c_frameRate__(');
 
     const safeCode = transformedCode.replace(/<\/script>/g, '<\\/script>');
     const startDelay = 500 + CROSSFADE_DURATION; // クロスフェード完了後にdraw開始
@@ -221,6 +287,7 @@
     var __drawEnabled = ${paused ? 'false' : 'true'};
     var __userFrameCount = 0;
     function __p5c_createCanvas__() { return null; }
+    function __p5c_frameRate__() { return null; }
 
     ${paused ? `
     setTimeout(function() {
@@ -260,8 +327,7 @@
 </body>
 </html>`;
 
-    const blob = new Blob([html], { type: 'text/html' });
-    return URL.createObjectURL(blob);
+    return html;
   }
 
   function showOverlay(title, author, icon) {
