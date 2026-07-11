@@ -41,6 +41,10 @@
     { pattern: /__frameOffset/, label: '__frameOffset' },
     { pattern: /__p5c_setup__/, label: '__p5c_setup__' },
     { pattern: /__p5c_draw__/, label: '__p5c_draw__' },
+    { pattern: /__p5c_frameRate__/, label: '__p5c_frameRate__' },
+    { pattern: /__p5c_createCanvas__/, label: '__p5c_createCanvas__' },
+    { pattern: /function\s+frameRate\s*\(/, label: 'function frameRate() の再定義' },
+    { pattern: /function\s+createCanvas\s*\(/, label: 'function createCanvas() の再定義' },
   ];
 
   // サンプル: 前の人の作品
@@ -98,7 +102,6 @@ function draw() {
   })();
 
   let p5Source = '';
-  let currentBlobUrl = null;
   let isRunning = false;
   let frameListener = null;
   let forceTimer = null;
@@ -115,6 +118,7 @@ function draw() {
   const overlayAuthor = document.getElementById('overlay-author');
   const overlayIcon = document.getElementById('overlay-icon');
   const phaseBar = document.getElementById('phase-bar');
+  const counter = document.getElementById('counter');
 
   function setPhase(phase) {
     phaseBar.querySelectorAll('.phase').forEach(el => {
@@ -125,6 +129,12 @@ function draw() {
   async function init() {
     try {
       const resp = await fetch('../viewer-fireworks/p5.min.js');
+      if (!resp.ok) {
+        console.error('p5.min.js の読み込みに失敗 (' + resp.status + ')');
+        validationResult.textContent = 'エラー: p5.min.js が読み込めません。';
+        validationResult.className = 'validation-result error';
+        return;
+      }
       p5Source = await resp.text();
     } catch (e) {
       console.error('p5.min.js の読み込みに失敗:', e);
@@ -201,26 +211,27 @@ function draw() {
   function stop() {
     isRunning = false;
     clearTimeout(forceTimer);
-    slotA.src = 'about:blank';
-    slotB.src = 'about:blank';
+    slotA.srcdoc = '';
+    slotA.removeAttribute('src');
+    slotB.srcdoc = '';
+    slotB.removeAttribute('src');
     slotA.classList.add('active');
     slotA.classList.remove('fading-out');
     slotB.classList.remove('active');
     slotB.classList.remove('fading-out');
     overlay.classList.remove('visible');
+    counter.classList.remove('visible');
     frameCounter.textContent = '000';
-
-    if (currentBlobUrl) {
-      URL.revokeObjectURL(currentBlobUrl);
-      currentBlobUrl = null;
-    }
   }
 
   function startSequence(userCode) {
     // Step 1: 前の人の作品を slotA で再生 (frameCount 270スタート = 残り1秒)
     setPhase('before');
-    const beforeBlob = createSketchBlobURL(SAMPLE_BEFORE, false, 270);
-    slotA.src = beforeBlob;
+    updateCounter(1, 3);
+    counter.classList.add('visible');
+    const beforeHtml = createSketchHTML(SAMPLE_BEFORE, false, 270);
+    slotA.removeAttribute('src');
+    slotA.srcdoc = beforeHtml;
     slotA.classList.add('active');
     slotA.classList.remove('fading-out');
     slotB.classList.remove('active');
@@ -229,9 +240,9 @@ function draw() {
     const onBeforeComplete = () => {
       if (!isRunning) return;
       // Step 2: ユーザー作品を slotB にロード（paused）
-      const userBlob = createSketchBlobURL(userCode, true);
-      currentBlobUrl = userBlob;
-      slotB.src = userBlob;
+      const userHtml = createSketchHTML(userCode, true);
+      slotB.removeAttribute('src');
+      slotB.srcdoc = userHtml;
 
       setTimeout(() => {
         if (!isRunning) return;
@@ -242,13 +253,14 @@ function draw() {
         slotA.classList.add('fading-out');
         slotB.classList.add('active');
         showOverlay('あなたの作品 (Your works)', 'あなた (You)', DUMMY_ICON);
+        updateCounter(2, 3);
 
         setTimeout(() => {
           if (!isRunning) return;
           setPhase('user');
-          slotA.src = 'about:blank';
+          slotA.srcdoc = '';
+          slotA.removeAttribute('src');
           slotA.classList.remove('fading-out');
-          URL.revokeObjectURL(beforeBlob);
           // 親側強制タイマー: 15秒で sketch-complete が来なくても強制的に次へ
           clearTimeout(forceTimer);
           forceTimer = setTimeout(() => {
@@ -265,8 +277,9 @@ function draw() {
     const onUserComplete = () => {
       if (!isRunning) return;
       // Step 3: 次の作品を slotA にロード
-      const afterBlob = createSketchBlobURL(SAMPLE_AFTER, true);
-      slotA.src = afterBlob;
+      const afterHtml = createSketchHTML(SAMPLE_AFTER, true);
+      slotA.removeAttribute('src');
+      slotA.srcdoc = afterHtml;
 
       setTimeout(() => {
         if (!isRunning) return;
@@ -275,16 +288,14 @@ function draw() {
         slotB.classList.add('fading-out');
         slotA.classList.add('active');
         showOverlay('次の作品 (Next works)', '次の人 (Next)', DUMMY_ICON);
+        updateCounter(3, 3);
 
         setTimeout(() => {
           if (!isRunning) return;
           setPhase('after');
-          slotB.src = 'about:blank';
+          slotB.srcdoc = '';
+          slotB.removeAttribute('src');
           slotB.classList.remove('fading-out');
-          if (currentBlobUrl) {
-            URL.revokeObjectURL(currentBlobUrl);
-            currentBlobUrl = null;
-          }
           // 次の作品が終わったら停止
         }, CROSSFADE_DURATION);
       }, 500);
@@ -316,7 +327,7 @@ function draw() {
     }
   }
 
-  function createSketchBlobURL(userCode, paused, startFrame) {
+  function createSketchHTML(userCode, paused, startFrame) {
     startFrame = startFrame || 0;
     const canvasMatch = userCode.match(/createCanvas\s*\(([^)]*)\)/);
     const useWebGL = canvasMatch ? /\bWEBGL\b/.test(canvasMatch[1]) : false;
@@ -326,7 +337,8 @@ function draw() {
       .replace(/function\s+draw\s*\(/g, 'function __p5c_draw__(')
       .replace(/\bdraw\s*=\s*/g, '__p5c_draw__ = ')
       .replace(/\bsetup\s*=\s*/g, '__p5c_setup__ = ')
-      .replace(/\bcreateCanvas\s*\(/g, '__p5c_createCanvas__(');
+      .replace(/\bcreateCanvas\s*\(/g, '__p5c_createCanvas__(')
+      .replace(/\bframeRate\s*\(/g, '__p5c_frameRate__(');
 
     const safeCode = transformedCode.replace(/<\/script>/g, '<\\/script>');
     const startDelay = 500 + CROSSFADE_DURATION;
@@ -366,6 +378,7 @@ function draw() {
     var __drawEnabled = ${paused ? 'false' : 'true'};
     var __userFrameCount = ${startFrame};
     function __p5c_createCanvas__() { return null; }
+    function __p5c_frameRate__() { return null; }
 
     ${paused ? `
     setTimeout(function() {
@@ -408,8 +421,7 @@ function draw() {
 </body>
 </html>`;
 
-    const blob = new Blob([html], { type: 'text/html' });
-    return URL.createObjectURL(blob);
+    return html;
   }
 
   function showOverlay(title, author, icon) {
@@ -424,9 +436,15 @@ function draw() {
     }
 
     overlay.classList.add('visible');
+    counter.classList.add('visible');
     setTimeout(() => {
       overlay.classList.remove('visible');
+      counter.classList.remove('visible');
     }, 6000);
+  }
+
+  function updateCounter(current, total) {
+    counter.textContent = `${current} / ${total}`;
   }
 
   init();

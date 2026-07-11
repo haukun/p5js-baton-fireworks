@@ -164,6 +164,14 @@
       color: #666;
     }
   </style>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-BXVQXL0LFX"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-BXVQXL0LFX');
+  </script>
 </head>
 <body>
   <div class="container">
@@ -182,6 +190,12 @@
     <p class="lead">An online gallery where everyone contributes 10-second "fireworks" animations made with p5.js, played back-to-back with crossfade transitions in random order.</p>
     <p>Once submitted, your fireworks will be displayed alongside other participants' works in a continuous loop.</p>
     <p><a href="https://haukun.github.io/p5js-baton-fireworks/" class="btn-link">View the Gallery</a></p>
+
+    <hr>
+
+    <!-- Event Period -->
+    <h2>📆 Event Period</h2>
+    <p class="lead">Until 2026/08/31 (JST)</p>
 
     <hr>
 
@@ -214,6 +228,9 @@
 
     <h3>🖼️ About createCanvas</h3>
     <p>Submitted sketches run with <code>createCanvas(400, 800)</code> or <code>createCanvas(400, 800, WEBGL)</code>. Any other <code>createCanvas()</code> in your code will be automatically replaced by the system.</p>
+
+    <h3>🎞️ About frameRate</h3>
+    <p>Submitted sketches automatically have <code>frameRate(30)</code> applied. Any other <code>frameRate()</code> in your code will be automatically removed by the system.</p>
 
     <h3 id="prohibited">⛔ Prohibited</h3>
     <ul>
@@ -250,14 +267,18 @@
         </ul>
       </li>
       <li>Click "Create"</li>
-      <li>A new Issue will be created. You can close the page. Within a few minutes, your submission will be automatically checked. If there are no issues, your work will be added to the gallery. You'll receive an email with the result, so please check it.</li>
+      <li>Wait for the automated check:
+        <ul class="nested">
+          <li>Once the Issue page appears, your submission is complete.</li>
+          <li>Within a few minutes, your code will be automatically checked. If there are no issues, your work will be added to the gallery. You'll receive an email with the result, so please check it.</li>
+        </ul>
+      </li>
       <li>Done!</li>
     </ol>
 
     <h3>⚠️ Notes</h3>
     <ul>
       <li>The Issue title field is pre-filled. <strong>Do not change it.</strong></li>
-      <li>No need to wrap code in <code>```javascript```</code> (the form handles it automatically)</li>
       <li>Works are managed per GitHub username — one submission per account (resubmit to overwrite)</li>
       <li>Submitted code is published on <a href="https://github.com/haukun/p5js-baton-fireworks/tree/main/entries">this repository</a>. Even after editing or deletion, history remains. Do not include personal information in your code.</li>
       <li>By submitting, you agree to the <a href="https://github.com/haukun/p5js-baton-fireworks/blob/main/SUBMISSION_TERMS.md">Submission Terms</a>.</li>
@@ -310,8 +331,8 @@
     </div>
 
     <div class="faq-item">
-      <p class="faq-q">Q: I included createCanvas() — is that OK?</p>
-      <p class="faq-a">A: No problem. The system removes it automatically.</p>
+      <p class="faq-q">Q: I included createCanvas() or frameRate() — is that OK?</p>
+      <p class="faq-a">A: No problem. The system removes them automatically.</p>
     </div>
 
     <div class="faq-item">

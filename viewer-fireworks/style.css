@@ -116,7 +116,7 @@ html, body {
 /* カウンター */
 #counter {
   position: absolute;
-  top: 16px;
+  bottom: 16px;
   right: 16px;
   z-index: 30;
   font-size: 12px;

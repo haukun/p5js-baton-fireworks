@@ -38,7 +38,8 @@ async function main() {
     .replace(/function\s+draw\s*\(/g, 'function __p5c_draw__(')
     .replace(/\bdraw\s*=\s*/g, '__p5c_draw__ = ')
     .replace(/\bsetup\s*=\s*/g, '__p5c_setup__ = ')
-    .replace(/\bcreateCanvas\s*\(/g, '__p5c_createCanvas__(');
+    .replace(/\bcreateCanvas\s*\(/g, '__p5c_createCanvas__(')
+    .replace(/\bframeRate\s*\(/g, '__p5c_frameRate__(');
 
   const safeCode = transformedCode.replace(/<\/script>/g, '<\\/script>');
 
@@ -67,6 +68,7 @@ async function main() {
     window.WebSocket = undefined;
     window.EventSource = undefined;
     window.RTCPeerConnection = undefined;
+    if (navigator.sendBeacon) navigator.sendBeacon = undefined;
     window.alert = function(){};
     window.confirm = function(){ return false; };
     window.prompt = function(){ return null; };
@@ -77,6 +79,7 @@ async function main() {
     var __drawEnabled = true;
     var __userFrameCount = 0;
     function __p5c_createCanvas__() { return null; }
+    function __p5c_frameRate__() { return null; }
 
     ${safeCode}
 
