@@ -9,336 +9,46 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: write
+  contents: read
   issues: write
-  pages: write
-  id-token: write
 
 jobs:
-  process:
+  # 作品受付は 2026/08/31 (JST) をもって終了しました。
+  # submission ラベル付きの Issue が作成された場合でも、エントリー処理は行わず、
+  # 受付終了の案内コメントを返して自動的にクローズします。
+  closed:
     runs-on: ubuntu-latest
     if: contains(github.event.issue.labels.*.name, 'submission')
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Parse and validate submission
-        id: parse
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const issue = context.payload.issue;
-            const body = issue.body || '';
-
-            const { parseAndValidate } = require('./scripts/validate-submission.js');
-            const { title, author, code, errors } = parseAndValidate(body);
-
-            // 作品IDの決定: 既に投稿済みなら既存のIDを使う（上書き）、なければ新規
-            const fs = require('fs');
-            const path = require('path');
-            const registryPath = path.join(process.cwd(), '.registry.json');
-            const registry = fs.existsSync(registryPath)
-              ? JSON.parse(fs.readFileSync(registryPath, 'utf-8'))
-              : {};
-            const username = issue.user.login;
-
-            const isUpdate = !!registry[username];
-            const entryName = isUpdate ? registry[username] : `entry-${issue.number}`;
-
-            core.setOutput('title', title);
-            core.setOutput('author', author);
-            core.setOutput('entry_name', entryName);
-            core.setOutput('errors', JSON.stringify(errors));
-            core.setOutput('username', username);
-            core.setOutput('has_errors', errors.length > 0 ? 'true' : 'false');
-            core.setOutput('is_update', isUpdate ? 'true' : 'false');
-
-      - name: Report validation errors
-        if: steps.parse.outputs.has_errors == 'true'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const errors = JSON.parse(${{ toJSON(steps.parse.outputs.errors) }});
-            const body = `## ❌ バリデーションエラー\n\n以下の問題を修正して、新しいIssueを作成してください:\n\n${errors.map(e => '- ' + e).join('\n')}\n\n---\n*このIssueは自動クローズされます。*`;
-
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: body
-            });
-
-            await github.rest.issues.update({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              state: 'closed',
-              labels: ['submission', 'invalid']
-            });
-
-      - name: Create entry file
-        if: steps.parse.outputs.has_errors == 'false'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const path = require('path');
-
-            const entryName = ${{ toJSON(steps.parse.outputs.entry_name) }};
-            const title = ${{ toJSON(steps.parse.outputs.title) }};
-            const author = ${{ toJSON(steps.parse.outputs.author) }};
-
-            const issue = context.payload.issue;
-            const body = issue.body || '';
-
-            function extractField(body, label) {
-              const regex = new RegExp(`### ${label}[^\\n]*\\s*\\n\\n([\\s\\S]*?)(?=\\n###|$)`);
-              const match = body.match(regex);
-              return match ? match[1].trim() : '';
-            }
-            let code = extractField(body, 'コード / Code');
-            code = code.replace(/^```javascript\n?/i, '').replace(/^```js\n?/i, '').replace(/\n?```$/g, '').trim();
-
-            // 参加者コードからTITLE/AUTHOR/区切り線を除去（システムが付け直す）
-            code = code.replace(/\/\/\s*=+\s*\n/g, '');
-            code = code.replace(/const\s+TITLE\s*=\s*.*;\s*\n?/g, '');
-            code = code.replace(/const\s+AUTHOR\s*=\s*.*;\s*\n?/g, '');
-            code = code.trim();
-
-            const dir = path.join('entries', entryName);
-            fs.mkdirSync(dir, { recursive: true });
-
-            const content = `// ============================================================\nconst TITLE = ${JSON.stringify(title)};\nconst AUTHOR = ${JSON.stringify(author)};\n// ============================================================\n\n${code}\n`;
-            fs.writeFileSync(path.join(dir, 'sketch.js'), content);
-
-      - name: Install Puppeteer
-        if: steps.parse.outputs.has_errors == 'false'
-        run: npm install puppeteer@24 --no-save
-
-      - name: Run sketch execution test
-        id: sketch-test
-        if: steps.parse.outputs.has_errors == 'false'
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          ENTRY_NAME="${{ steps.parse.outputs.entry_name }}"
-          xvfb-run --auto-servernum node scripts/validate-sketch.js "entries/${ENTRY_NAME}/sketch.js" 2>&1 | tee /tmp/sketch-test-output.txt
-
-      - name: Report sketch execution failure
-        if: steps.parse.outputs.has_errors == 'false' && steps.sketch-test.outcome == 'failure'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            let detail = '';
-            try {
-              detail = fs.readFileSync('/tmp/sketch-test-output.txt', 'utf-8').trim();
-            } catch (e) {}
-            const message = detail || '作品が正常終了しませんでした。';
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: `## ❌ 実行テスト失敗\n\n${message}\n\n[Playground](https://haukun.github.io/p5js-baton-fireworks/playground/) でコードの動作を確認し、修正してから再度投稿してください。\n\n---\n*このIssueは自動クローズされます。*`
-            });
-            await github.rest.issues.update({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              state: 'closed',
-              labels: ['submission', 'invalid']
-            });
-
-      - name: Abort if sketch test failed
-        if: steps.parse.outputs.has_errors == 'false' && steps.sketch-test.outcome == 'failure'
-        run: exit 1
-      - name: Download icon if provided
-        if: steps.parse.outputs.has_errors == 'false'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const path = require('path');
-            const https = require('https');
-
-            const issue = context.payload.issue;
-            const body = issue.body || '';
-            const entryName = ${{ toJSON(steps.parse.outputs.entry_name) }};
-
-            function extractField(body, label) {
-              const regex = new RegExp(`### ${label}[^\\n]*\\s*\\n\\n([\\s\\S]*?)(?=\\n###|$)`);
-              const match = body.match(regex);
-              return match ? match[1].trim() : '';
-            }
-
-            const iconField = extractField(body, 'アイコン画像 / Icon');
-            
-            // Markdown画像URL または HTML imgタグからURLを抽出
-            let imgUrl = null;
-            const mdMatch = iconField.match(/!\[.*?\]\((https:\/\/[^)]+)\)/);
-            const htmlMatch = iconField.match(/<img[^>]+src="(https:\/\/[^"]+)"/);
-            if (mdMatch) imgUrl = mdMatch[1];
-            else if (htmlMatch) imgUrl = htmlMatch[1];
-
-            if (!imgUrl) {
-              console.log('No icon image found, skipping');
-              return;
-            }
-            console.log('Icon URL:', imgUrl);
-
-            // URLホスト制限: GitHub添付画像のみ許可
-            const allowedHosts = ['github.com', 'user-images.githubusercontent.com', 'avatars.githubusercontent.com', 'raw.githubusercontent.com'];
-            try {
-              const urlHost = new URL(imgUrl).hostname;
-              if (!allowedHosts.some(h => urlHost === h || urlHost.endsWith('.' + h))) {
-                console.log(`Icon URL host not allowed: ${urlHost}, skipping`);
-                return;
-              }
-            } catch (e) {
-              console.log('Invalid icon URL, skipping');
-              return;
-            }
-
-            // ダウンロード（リダイレクト最大5回、サイズ上限200KB、タイムアウト10秒、Content-Typeチェック）
-            const MAX_REDIRECTS = 5;
-            const MAX_SIZE = 200 * 1024;
-            const DOWNLOAD_TIMEOUT = 10000;
-            const ALLOWED_CONTENT_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
-
-            const download = (url, redirectCount = 0) => new Promise((resolve, reject) => {
-              if (redirectCount > MAX_REDIRECTS) {
-                return reject(new Error('Too many redirects'));
-              }
-              const req = https.get(url, (res) => {
-                if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-                  res.resume();
-                  return download(res.headers.location, redirectCount + 1).then(resolve).catch(reject);
-                }
-                if (res.statusCode !== 200) {
-                  res.resume();
-                  return reject(new Error(`HTTP ${res.statusCode}`));
-                }
-                // Content-Type チェック
-                const contentType = (res.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
-                if (!ALLOWED_CONTENT_TYPES.includes(contentType)) {
-                  res.destroy();
-                  return reject(new Error(`Invalid Content-Type: ${contentType}`));
-                }
-                const chunks = [];
-                let totalSize = 0;
-                res.on('data', (chunk) => {
-                  totalSize += chunk.length;
-                  if (totalSize > MAX_SIZE) {
-                    res.destroy();
-                    return reject(new Error(`Download exceeds ${MAX_SIZE} bytes, aborted`));
-                  }
-                  chunks.push(chunk);
-                });
-                res.on('end', () => resolve(Buffer.concat(chunks)));
-                res.on('error', reject);
-              });
-              req.on('error', reject);
-              req.setTimeout(DOWNLOAD_TIMEOUT, () => {
-                req.destroy();
-                reject(new Error('Download timeout'));
-              });
-            });
-
-            let data;
-            try {
-              data = await download(imgUrl);
-            } catch (e) {
-              console.log(`Icon download failed: ${e.message}, skipping`);
-              return;
-            }
-
-            // サイズチェック (200KB)
-            if (data.length > MAX_SIZE) {
-              console.log(`Icon too large (${data.length} bytes), skipping`);
-              return;
-            }
-
-            // 拡張子を判定
-            let ext = 'png';
-            if (imgUrl.match(/\.jpe?g/i)) ext = 'jpg';
-            else if (imgUrl.match(/\.gif/i)) ext = 'gif';
-            else if (imgUrl.match(/\.webp/i)) ext = 'webp';
-
-            const iconPath = path.join('entries', entryName, `icon.${ext}`);
-            fs.writeFileSync(iconPath, data);
-            console.log(`Icon saved: ${iconPath} (${data.length} bytes)`);
-
-      - name: Update registry
-        if: steps.parse.outputs.has_errors == 'false'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const username = ${{ toJSON(steps.parse.outputs.username) }};
-            const entryName = ${{ toJSON(steps.parse.outputs.entry_name) }};
-            const reg = JSON.parse(fs.readFileSync('.registry.json', 'utf-8'));
-            reg[username] = entryName;
-            fs.writeFileSync('.registry.json', JSON.stringify(reg, null, 2) + '\n');
-
-      - name: Build entries.json
-        if: steps.parse.outputs.has_errors == 'false'
-        run: node scripts/build-entries.js
-
-      - name: Commit and push
-        if: steps.parse.outputs.has_errors == 'false'
-        run: |
-          ENTRY_NAME="${{ steps.parse.outputs.entry_name }}"
-
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add entries/ .registry.json viewer-fireworks/entries.json
-          git commit -m "Add entry: ${ENTRY_NAME} (via issue #${{ github.event.issue.number }})"
-          git push
-
-      - name: Prepare deploy directory
-        if: steps.parse.outputs.has_errors == 'false'
-        run: |
-          mkdir -p _site/viewer-fireworks
-          cp -r viewer-fireworks/* _site/viewer-fireworks/
-          cp -r entries _site/entries
-          cp -r playground _site/playground
-          cp -r admin _site/admin
-          cp -r assets _site/assets
-          mkdir -p _site/docs
-          cp docs/guide.html _site/docs/guide.html
-          cp docs/guide-en.html _site/docs/guide-en.html
-          echo '<meta http-equiv="refresh" content="0;url=viewer-fireworks/">' > _site/index.html
-
-      - name: Upload Pages artifact
-        if: steps.parse.outputs.has_errors == 'false'
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: _site
-
-      - name: Deploy to GitHub Pages
-        if: steps.parse.outputs.has_errors == 'false'
-        uses: actions/deploy-pages@v4
-
-      - name: Close issue with success
-        if: steps.parse.outputs.has_errors == 'false'
+      - name: Notify submissions closed and close issue
         uses: actions/github-script@v7
         with:
           script: |
             const siteUrl = 'https://haukun.github.io/p5js-baton-fireworks/';
-            const entryName = ${{ toJSON(steps.parse.outputs.entry_name) }};
-            const shareUrl = `${siteUrl}viewer-fireworks/?start=${entryName}`;
-
-            const isUpdate = '${{ steps.parse.outputs.is_update }}' === 'true';
-            const msg = isUpdate ? '更新' : '登録';
+            const body = [
+              '## 🙇 作品の受付は終了しました / Submissions are now closed',
+              '',
+              'この企画の作品受付は **2026/08/31 (JST)** をもって終了しました。',
+              '新規投稿および作品の変更（更新）はできません。ご参加ありがとうございました！',
+              '',
+              'The submission period ended on **2026/08/31 (JST)**.',
+              'New submissions and updates are no longer accepted. Thank you for participating!',
+              '',
+              '---',
+              '',
+              `- 🎆 ギャラリーで作品を見る / View the gallery: ${siteUrl}`,
+              '- 🗑️ 投稿済み作品の削除は引き続き可能です。「作品を削除する / Delete a Sketch」からどうぞ。',
+              '  You can still delete your submission via "🗑️ Delete a Sketch".',
+              '',
+              '---',
+              '*このIssueは自動クローズされます。 / This issue will be closed automatically.*',
+            ].join('\n');
 
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: `## ✅ ${msg}完了！\n\nあなたの作品が${msg}されました！\n\n🎆 ギャラリーで見る: ${siteUrl}\n\n🔗 あなたの作品が最初に再生されるURL（SNSでシェアしよう！）:\n${shareUrl}\n\n---\n*このIssueは自動クローズされます。*`
+              body,
             });
 
             await github.rest.issues.update({
@@ -346,5 +56,5 @@ jobs:
               repo: context.repo.repo,
               issue_number: context.issue.number,
               state: 'closed',
-              labels: ['submission', 'accepted']
+              labels: ['submission', 'closed'],
             });

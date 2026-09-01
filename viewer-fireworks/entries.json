@@ -48,15 +48,5 @@
     "title": "つぶやき花火",
     "author": "はぅ君(Haukun)",
     "icon": "icon.png"
-  },
-  {
-    "id": "example-1",
-    "title": "First Fireworks",
-    "author": "p5js baton project"
-  },
-  {
-    "id": "example-2",
-    "title": "HANABI",
-    "author": "p5js baton team"
   }
 ]
